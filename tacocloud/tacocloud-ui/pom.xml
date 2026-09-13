@@ -17,21 +17,22 @@
 	<description>Taco Cloud UI</description>
 
   <properties>
-      <node.version>v6.9.1</node.version>
+      <node.version>v12.22.9</node.version>
+      <npm.version>6.14.16</npm.version>
       <yarn.version>v0.24.6</yarn.version>
-      <frontend-maven-plugin.version>1.4</frontend-maven-plugin.version>
+      <frontend-maven-plugin.version>1.12.1</frontend-maven-plugin.version>
       <environment>dev</environment>
   </properties>
 
   <build>
-    <resources>
+    <!-- <resources>
       <resource>
         <directory>dist</directory>
         <includes>
           <include>**/*</include>
         </includes>
       </resource>
-    </resources>
+    </resources> -->
 
     <plugins>
       <plugin>
@@ -61,6 +62,8 @@
             <configuration>
               <nodeVersion>${node.version}</nodeVersion>
               <npmVersion>${npm.version}</npmVersion>
+              <!-- <nodeVersion>v12.22.9</nodeVersion>
+              <npmVersion>6.14.16</npmVersion> -->
             </configuration>
           </execution>
           <execution>
@@ -86,9 +89,29 @@
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
-        <configuration>
-          <outputDirectory> ${project.build.outputDirectory}\static</outputDirectory>
-        </configuration>
+        <!-- <configuration>
+          <outputDirectory>${project.build.outputDirectory}\static</outputDirectory>
+        </configuration> -->
+        <executions>
+          <execution>
+            <id>copy-resources</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+              <resources>
+                <resource>
+                   <directory>dist</directory>
+                    <includes>
+                      <include>**/*</include>
+                    </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
