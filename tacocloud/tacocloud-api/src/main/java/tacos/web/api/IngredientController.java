@@ -2,6 +2,8 @@ package tacos.web.api;
 
 import java.net.URI;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -61,19 +65,22 @@ public class IngredientController {
   }
 
   @PostMapping
-  public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody Mono<Ingredient> ingredient) {
-    return ingredient
+  public Mono<ResponseEntity<Ingredient>> postIngredient(@Valid @RequestBody Ingredient ingredient, UriComponentsBuilder uriBuilder) {
+
+    return Mono.just(ingredient)
         .flatMap(repo::save)
         .map(i -> {
-          HttpHeaders headers = new HttpHeaders();
-          headers.setLocation(URI.create("http://localhost:8080/ingredients/" + i.getId()));
-          return new ResponseEntity<Ingredient>(i, headers, HttpStatus.CREATED);
+          URI location = uriBuilder
+              .path("/api/ingredients/{id}")
+              .buildAndExpand(i.getId())
+              .toUri();
+          return ResponseEntity.created(location).body(i);
         });
   }
 
   @DeleteMapping("/{id}")
   public Mono<ResponseEntity<Ingredient>> deleteIngredient(@PathVariable String id) {
-    // repo.deleteById(id);\
+    // repo.deleteById(id);
     return repo.findById(id).flatMap(existingIngredient -> repo.delete(existingIngredient)
         .thenReturn(ResponseEntity.noContent().<Ingredient>build()))
     .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));

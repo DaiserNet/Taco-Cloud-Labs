@@ -1,0 +1,23 @@
+# Archivos de configuracion de VS
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# Arvhivos temporales de los documentos de word y powerpoint
+.DS_Store
+Thumbs.db
+~$*.docx
+~$*.pptx
+~$*.xlsx
+
+# Logs
+*.log
+
+# Archivos de compilacion
+target/
+*.class
+*.jar
+*.war

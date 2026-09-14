@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 
 @ContextConfiguration(classes = IngredientController.class)
 @WebFluxTest(controllers = IngredientController.class, excludeAutoConfiguration = { org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration.class })
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class IngredientControllerTest {
     
     @Autowired
@@ -120,5 +119,40 @@ public class IngredientControllerTest {
             .expectStatus().isNotFound();
         Mockito.verify(repo, Mockito.times(0)).delete(Mockito.any(Ingredient.class));
     }
-    
+
+    // Post test case
+    @Test
+    public void shouldCreateIngredient() {
+        Ingredient ingredient = new Ingredient("PICK", "Pickle", Ingredient.Type.VEGGIES);
+
+        Mockito.when(repo.save(Mockito.any(Ingredient.class)))
+            .thenReturn(Mono.just(ingredient));
+
+        testClient.post().uri("/api/ingredients")
+            .bodyValue(ingredient)
+            .exchange()
+            .expectStatus().isCreated()
+            .expectHeader().valueMatches("Location", ".*/api/ingredients/PICK")
+            .expectBody()
+                .jsonPath("$.id").isEqualTo("PICK")
+                .jsonPath("$.name").isEqualTo("Pickle")
+                .jsonPath("$.type").isEqualTo("VEGGIES");
+        Mockito.verify(repo, Mockito.times(1)).save(Mockito.argThat(i -> 
+            i.getId().equals("PICK") &&
+            i.getName().equals("Pickle") &&
+            i.getType() == Ingredient.Type.VEGGIES
+        ));
+    }
+
+    @Test
+    public void shouldReturnBadRequestForInvalidIngredient() {
+        Ingredient invalidIngredient = new Ingredient("", "", null);
+
+        testClient.post().uri("/api/ingredients")
+            .bodyValue(invalidIngredient)
+            .exchange()
+            .expectStatus().isBadRequest();
+        Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
+    }
+
 }
