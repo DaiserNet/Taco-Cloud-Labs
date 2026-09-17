@@ -3,6 +3,7 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.PersistenceConstructor;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.
@@ -15,8 +16,8 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 
 @Data
-@NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
-@RequiredArgsConstructor
+// @NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
+// @RequiredArgsConstructor
 @Document
 public class User implements UserDetails {
 
@@ -36,6 +37,21 @@ public class User implements UserDetails {
   private final String phoneNumber;
   private final String email;
   
+  @PersistenceConstructor 
+  public User(String username, String password, String fullname, String street,
+              String city, String state, String zip, String phoneNumber,
+              String email) {
+    this.username = username;
+    this.password = password;
+    this.fullname = fullname;
+    this.street = street;
+    this.city = city;
+    this.state = state;
+    this.zip = zip;
+    this.phoneNumber = phoneNumber;
+    this.email = email;
+  }
+
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
     return Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));

@@ -16,8 +16,8 @@ import tacos.data.IngredientRepository;
 
 import org.junit.jupiter.api.Test;
 
-@ContextConfiguration(classes = IngredientController.class)
-@WebFluxTest(controllers = IngredientController.class, excludeAutoConfiguration = { org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration.class })
+    @ContextConfiguration(classes = IngredientController.class)
+    @WebFluxTest(controllers = IngredientController.class, excludeAutoConfiguration = { org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration.class })
 public class IngredientControllerTest {
     
     @Autowired

@@ -13,6 +13,7 @@ import tacos.data.IngredientRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.TacoRepository;
 import tacos.data.UserRepository;
+import tacos.data.OrderRepository;
 
 @Profile("!prod")
 @Configuration
@@ -21,7 +22,7 @@ public class DevelopmentConfig {
   @Bean
   public CommandLineRunner dataLoader(IngredientRepository repo,
         UserRepository userRepo, PasswordEncoder encoder, TacoRepository tacoRepo,
-        PaymentMethodRepository paymentMethodRepo) { // user repo for ease of testing with a built-in user
+        OrderRepository orderRepo, PaymentMethodRepository paymentMethodRepo) { // user repo for ease of testing with a built-in user
     
     return new CommandLineRunner() {
       @Override
@@ -43,9 +44,29 @@ public class DevelopmentConfig {
               "Craig Walls", "123 North Street", "Cross Roads", "TX", 
               "76227", "123-123-1234", "craig@habuma.com"))
           .subscribe(user -> {
+              TacoOrder order = new TacoOrder();
+
+              order.setId("ORDER1");
+              order.setUser(user);
+              order.setDeliveryName("Craig Walls");
+              order.setDeliveryStreet("123 North Street");
+              order.setDeliveryCity("Cross Roads");
+              order.setDeliveryState("TX");
+              order.setDeliveryZip("76227");
+              orderRepo.save(order).subscribe();
               paymentMethodRepo.save(new PaymentMethod(user, "4111111111111111", "321", "10/25")).subscribe();
-          });        
+          });       
+          
         
+        // Pruebas para TC-04
+        
+        userRepo.save(new User("testuser", encoder.encode("password"), 
+              "Test User", "456 South Street", "Somewhere", "CA", 
+              "90210", "987-654-3210", "testuser@test.com"))
+          .subscribe(user -> {
+              paymentMethodRepo.save(new PaymentMethod(user, "55555555555555555", "123", "9/26")).subscribe();
+          });
+
         Taco taco1 = new Taco();
         taco1.setId("TACO1");
         taco1.setName("Carnivore");
