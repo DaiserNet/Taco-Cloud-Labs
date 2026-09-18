@@ -56,14 +56,6 @@ public class OrderApiController {
     return repo.findAll();
   }
 
-//  @PostMapping(consumes="application/json")
-//  @ResponseStatus(HttpStatus.CREATED)
-//  public Mono<Order> postOrder(@RequestBody Mono<Order> order) {
-//    order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into reactive flow below
-//    return order
-//        .flatMap(repo::save);
-//  }
-
   @PostMapping(consumes="application/json")
   @ResponseStatus(HttpStatus.CREATED)
   public Mono<TacoOrder> postOrder(@RequestBody TacoOrder order) {
@@ -73,11 +65,12 @@ public class OrderApiController {
 
   @PostMapping(path="fromEmail", consumes="application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<TacoOrder> postOrderFromEmail(@RequestBody Mono<EmailOrder> emailOrder) {
-    Mono<TacoOrder> order = emailOrderService.convertEmailOrderToDomainOrder(emailOrder);
-    order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into reactive flow below
-    return order
-        .flatMap(repo::save);
+  public Mono<TacoOrder> postOrderFromEmail(@Valid @RequestBody EmailOrder emailOrder) {
+    return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
+        .flatMap(repo::save)
+        .flatMap(savedOrder -> Mono.fromRunnable(
+            () -> orderMessages.sendOrder(savedOrder))
+            .thenReturn(savedOrder));
   }
 
   @PutMapping(path="/{orderId}", consumes="application/json")
