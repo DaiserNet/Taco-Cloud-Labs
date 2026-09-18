@@ -6,12 +6,10 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Valid;
 import javax.validation.Validator;
 
-import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tacos.OrderStatus;
 import tacos.TacoOrder;
-import tacos.User;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
@@ -83,8 +81,29 @@ public class OrderApiController {
   }
 
   @PutMapping(path="/{orderId}", consumes="application/json")
-  public Mono<TacoOrder> putOrder(@RequestBody Mono<TacoOrder> order) {
-    return order.flatMap(repo::save);
+  public Mono<ResponseEntity<TacoOrder>> putOrder(
+      @PathVariable("orderId") String orderId,
+      @Valid @RequestBody OrderReplaceRequest replacement,
+      Authentication authentication) {
+    if (isUnauthenticated(authentication)) {
+      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+    }
+
+    return Mono.defer(() -> repo.findById(orderId)
+        .flatMap(order -> {
+          if (!isOwnerOrAdmin(order, authentication)) {
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .<TacoOrder>build());
+          }
+          if (!isEditable(order)) {
+            return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT)
+                .<TacoOrder>build());
+          }
+
+          replacement.applyTo(order);
+          return repo.save(order).map(ResponseEntity::ok);
+        }))
+        .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
   }
 
   @PatchMapping(path="/{orderId}", consumes="application/json")
@@ -92,7 +111,7 @@ public class OrderApiController {
                           @Valid @RequestBody OrderPatchRequest patch,
                           Authentication authentication) {
     
-    if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+    if (isUnauthenticated(authentication)) {
       return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).<TacoOrder>build());
     }
     
@@ -141,12 +160,33 @@ public class OrderApiController {
     return isOwner || isAdmin;
   }
 
+  private boolean isUnauthenticated(Authentication authentication) {
+    return authentication == null || authentication instanceof AnonymousAuthenticationToken;
+  }
+
+  private boolean isEditable(TacoOrder order) {
+    return order.getStatus() == null || order.getStatus() == OrderStatus.PLACED;
+  }
+
   @DeleteMapping("/{orderId}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deleteOrder(@PathVariable("orderId") String orderId) {
-    try {
-      repo.deleteById(orderId);
-    } catch (EmptyResultDataAccessException e) {}
+  public Mono<ResponseEntity<Void>> deleteOrder(
+      @PathVariable("orderId") String orderId, Authentication authentication) {
+    if (isUnauthenticated(authentication)) {
+      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+    }
+
+    return Mono.defer(() -> repo.findById(orderId)
+        .flatMap(order -> {
+          if (!isOwnerOrAdmin(order, authentication)) {
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build());
+          }
+          if (!isEditable(order)) {
+            return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).<Void>build());
+          }
+          return repo.deleteById(orderId)
+              .thenReturn(ResponseEntity.noContent().<Void>build());
+        }))
+        .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
   }
 
 }

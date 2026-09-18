@@ -21,6 +21,8 @@ public class TacoOrder implements Serializable {
 
   private User user;
 
+  private OrderStatus status = OrderStatus.PLACED;
+
   private String deliveryName;
 
   private String deliveryStreet;
