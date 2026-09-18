@@ -30,6 +30,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -123,8 +124,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("MISSING")).thenReturn(Mono.empty());
 
     StepVerifier.create(controller.putOrder("MISSING", replacement(), userAuthentication("habuma")))
-        .assertNext(response -> assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.NOT_FOUND))
+        .verify();
 
     verify(repo, never()).save(any(TacoOrder.class));
   }
@@ -135,8 +136,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("ORDER1")).thenReturn(Mono.just(existing));
 
     StepVerifier.create(controller.putOrder("ORDER1", replacement(), userAuthentication("other")))
-        .assertNext(response -> assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.FORBIDDEN))
+        .verify();
 
     verify(repo, never()).save(any(TacoOrder.class));
   }
@@ -148,8 +149,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("ORDER1")).thenReturn(Mono.just(existing));
 
     StepVerifier.create(controller.putOrder("ORDER1", replacement(), userAuthentication("habuma")))
-        .assertNext(response -> assertEquals(HttpStatus.CONFLICT, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.CONFLICT))
+        .verify();
 
     verify(repo, never()).save(any(TacoOrder.class));
   }
@@ -178,8 +179,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("MISSING")).thenReturn(Mono.empty());
 
     StepVerifier.create(controller.deleteOrder("MISSING", userAuthentication("habuma")))
-        .assertNext(response -> assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.NOT_FOUND))
+        .verify();
 
     verify(repo, never()).deleteById(any(String.class));
   }
@@ -190,8 +191,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("ORDER1")).thenReturn(Mono.just(existing));
 
     StepVerifier.create(controller.deleteOrder("ORDER1", userAuthentication("other")))
-        .assertNext(response -> assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.FORBIDDEN))
+        .verify();
 
     verify(repo, never()).deleteById(any(String.class));
   }
@@ -203,8 +204,8 @@ class OrderPutDeleteControllerTest {
     when(repo.findById("ORDER1")).thenReturn(Mono.just(existing));
 
     StepVerifier.create(controller.deleteOrder("ORDER1", userAuthentication("habuma")))
-        .assertNext(response -> assertEquals(HttpStatus.CONFLICT, response.getStatusCode()))
-        .verifyComplete();
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.CONFLICT))
+        .verify();
 
     verify(repo, never()).deleteById(any(String.class));
   }
@@ -253,5 +254,10 @@ class OrderPutDeleteControllerTest {
   private Authentication adminAuthentication() {
     return new UsernamePasswordAuthenticationToken("admin", "password",
         Arrays.asList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+  }
+
+  private boolean hasStatus(Throwable error, HttpStatus status) {
+    return error instanceof ResponseStatusException
+        && ((ResponseStatusException) error).getStatus() == status;
   }
 }

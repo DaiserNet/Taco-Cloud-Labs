@@ -1,36 +1,39 @@
 package tacos.web.api;
 
 import org.mockito.Mockito;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
 import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
 import tacos.api.dto.IngredientRequest;
 import tacos.api.dto.IngredientResponse;
+import tacos.api.error.ApiExceptionHandler;
 import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-    @ContextConfiguration(classes = {IngredientController.class, IngredientMapper.class})
-    @WebFluxTest(controllers = IngredientController.class, excludeAutoConfiguration = { org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration.class })
 public class IngredientControllerTest {
-    
-    @Autowired
+
     private WebTestClient testClient;
 
-    @MockBean
     private IngredientRepository repo; 
 
-    @Autowired
     private IngredientController controller;
+
+    @BeforeEach
+    public void setUp() {
+        repo = Mockito.mock(IngredientRepository.class);
+        controller = new IngredientController(repo, new IngredientMapper());
+        testClient = MockMvcWebTestClient.bindToController(controller)
+            .controllerAdvice(new ApiExceptionHandler())
+            .build();
+    }
 
     // Put test case
     @Test
@@ -64,7 +67,9 @@ public class IngredientControllerTest {
         testClient.put().uri("/api/ingredients/FLTO")
             .bodyValue(request("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
             .exchange()
-            .expectStatus().isBadRequest();
+            .expectStatus().isBadRequest()
+            .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody().jsonPath("$.code").isEqualTo("MALFORMED_REQUEST");
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
     }
 
@@ -74,7 +79,9 @@ public class IngredientControllerTest {
         testClient.put().uri("/api/ingredients/LFTO")
             .bodyValue(request("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
             .exchange()
-            .expectStatus().isNotFound();
+            .expectStatus().isNotFound()
+            .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody().jsonPath("$.code").isEqualTo("RESOURCE_NOT_FOUND");
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
     }
 
@@ -122,7 +129,9 @@ public class IngredientControllerTest {
             .thenReturn(Mono.empty());
         testClient.delete().uri("/api/ingredients/FLTO")
             .exchange()
-            .expectStatus().isNotFound();
+            .expectStatus().isNotFound()
+            .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody().jsonPath("$.code").isEqualTo("RESOURCE_NOT_FOUND");
         Mockito.verify(repo, Mockito.times(0)).delete(Mockito.any(Ingredient.class));
     }
 
@@ -157,7 +166,9 @@ public class IngredientControllerTest {
         testClient.post().uri("/api/ingredients")
             .bodyValue(invalidIngredient)
             .exchange()
-            .expectStatus().isBadRequest();
+            .expectStatus().isEqualTo(422)
+            .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED");
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
     }
 

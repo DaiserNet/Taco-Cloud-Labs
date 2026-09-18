@@ -21,6 +21,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 
 import static org.springframework.test.web.servlet.request
@@ -28,11 +29,14 @@ import static org.springframework.test.web.servlet.request
 
 import static org.springframework.test.web.servlet.result
     .MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
 import tacos.User;
+import tacos.api.error.ApiExceptionHandler;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
@@ -124,10 +128,8 @@ public class OrderApiControllerTest {
         Mockito.when(repo.findById("12345")).thenReturn(Mono.just(order));
 
         StepVerifier.create(controller.patchOrder("12345", patch, authentication))
-            .assertNext(response -> {
-                assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-            })
-            .verifyComplete();
+            .expectErrorMatches(error -> hasStatus(error, HttpStatus.FORBIDDEN))
+            .verify();
         Mockito.verify(repo, Mockito.never()).save(Mockito.any(TacoOrder.class));
     }
 
@@ -142,21 +144,28 @@ public class OrderApiControllerTest {
         Mockito.when(repo.findById("nonexistent")).thenReturn(Mono.empty());
 
         StepVerifier.create(controller.patchOrder("nonexistent", patch, authentication))
-            .assertNext(response -> {
-                assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-            })
-            .verifyComplete();
+            .expectErrorMatches(error -> hasStatus(error, HttpStatus.NOT_FOUND))
+            .verify();
         Mockito.verify(repo, Mockito.never()).save(Mockito.any(TacoOrder.class));
     }
 
     @Test 
     public void shouldRejectForbiddenPatchField() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
+            .setControllerAdvice(new ApiExceptionHandler())
+            .build();
 
         mockMvc.perform(patch("/api/orders/ORDER1").contentType(MediaType.APPLICATION_JSON)
             .content("{\"deliveryZip\":\"75001\","
                 + "\"ccNumber\":\"41111111111111111\"}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
         Mockito.verifyNoInteractions(repo);
+    }
+
+    private boolean hasStatus(Throwable error, HttpStatus status) {
+        return error instanceof ResponseStatusException
+            && ((ResponseStatusException) error).getStatus() == status;
     }
 }

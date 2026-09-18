@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -50,14 +51,16 @@ public class IngredientController {
 
   @GetMapping("/{id}")
   public Mono<IngredientResponse> byId(@PathVariable String id) {
-    return repo.findById(id).map(ingredientMapper::toResponse);
+    return repo.findById(id)
+        .map(ingredientMapper::toResponse)
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
   @PutMapping("/{id}")
   public Mono<ResponseEntity<IngredientResponse>> updateIngredient(
       @PathVariable String id, @Valid @RequestBody IngredientRequest request) {
     if (!id.equals(request.getId())) {
-      return Mono.just(ResponseEntity.badRequest().build());
+      return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST));
     }
 
     return repo.findById(id).flatMap(existingIngredient -> {
@@ -66,7 +69,7 @@ public class IngredientController {
     })
         .map(ingredientMapper::toResponse)
         .map(ResponseEntity::ok)
-        .defaultIfEmpty(ResponseEntity.notFound().build());
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
   @PostMapping
@@ -87,7 +90,7 @@ public class IngredientController {
   public Mono<ResponseEntity<Void>> deleteIngredient(@PathVariable String id) {
     return repo.findById(id).flatMap(existingIngredient -> repo.delete(existingIngredient)
         .thenReturn(ResponseEntity.noContent().<Void>build()))
-    .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
 }

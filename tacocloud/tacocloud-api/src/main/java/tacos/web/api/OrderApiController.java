@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -87,19 +88,16 @@ public class OrderApiController {
       @Valid @RequestBody OrderReplaceRequest replacement,
       Authentication authentication) {
     if (isUnauthenticated(authentication)) {
-      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .<OrderResponse>build());
+      return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     return Mono.defer(() -> repo.findById(orderId)
         .flatMap(order -> {
           if (!isOwnerOrAdmin(order, authentication)) {
-            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .<OrderResponse>build());
+            return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
           }
           if (!isEditable(order)) {
-            return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT)
-                .<OrderResponse>build());
+            return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT));
           }
 
           replacement.applyTo(order);
@@ -107,7 +105,7 @@ public class OrderApiController {
               .map(orderMapper::toResponse)
               .map(ResponseEntity::ok);
         }))
-        .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
   @PatchMapping(path="/{orderId}", consumes="application/json")
@@ -116,28 +114,25 @@ public class OrderApiController {
                           Authentication authentication) {
     
     if (isUnauthenticated(authentication)) {
-      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .<OrderResponse>build());
+      return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
     
     return repo.findById(orderId).flatMap(order -> {
       if (!isOwnerOrAdmin(order, authentication)) {
-        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .<OrderResponse>build());
+        return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
       }
       
       applyPatch(order, patch);
       Set<ConstraintViolation<TacoOrder>> violations = validator.validate(order);
 
       if(!violations.isEmpty()) {
-        return Mono.just(ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-            .<OrderResponse>build());
+        return Mono.error(new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY));
       }
 
       return repo.save(order)
           .map(orderMapper::toResponse)
           .map(ResponseEntity::ok);
-    }).switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+    }).switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
   private void applyPatch(TacoOrder order, OrderPatchRequest patch) {
@@ -181,21 +176,21 @@ public class OrderApiController {
   public Mono<ResponseEntity<Void>> deleteOrder(
       @PathVariable("orderId") String orderId, Authentication authentication) {
     if (isUnauthenticated(authentication)) {
-      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+      return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     return Mono.defer(() -> repo.findById(orderId)
         .flatMap(order -> {
           if (!isOwnerOrAdmin(order, authentication)) {
-            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build());
+            return Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
           }
           if (!isEditable(order)) {
-            return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).<Void>build());
+            return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT));
           }
           return repo.deleteById(orderId)
               .thenReturn(ResponseEntity.noContent().<Void>build());
         }))
-        .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)));
   }
 
 }
