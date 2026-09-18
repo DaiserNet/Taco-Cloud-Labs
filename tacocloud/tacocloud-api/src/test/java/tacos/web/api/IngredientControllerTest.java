@@ -12,11 +12,14 @@ import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
+import tacos.api.dto.IngredientRequest;
+import tacos.api.dto.IngredientResponse;
+import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 import org.junit.jupiter.api.Test;
 
-    @ContextConfiguration(classes = IngredientController.class)
+    @ContextConfiguration(classes = {IngredientController.class, IngredientMapper.class})
     @WebFluxTest(controllers = IngredientController.class, excludeAutoConfiguration = { org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration.class })
 public class IngredientControllerTest {
     
@@ -37,7 +40,7 @@ public class IngredientControllerTest {
         Mockito.when(repo.save(Mockito.any(Ingredient.class)))
             .thenReturn(Mono.just(new Ingredient("FLTO", "New Flour Tortilla", Ingredient.Type.WRAP)));    
         testClient.put().uri("/api/ingredients/FLTO")
-            .bodyValue(new Ingredient("FLTO", "New Flour Tortilla", Ingredient.Type.WRAP))
+            .bodyValue(request("FLTO", "New Flour Tortilla", Ingredient.Type.WRAP))
             .exchange()
             .expectStatus().isOk()
             .expectBody()
@@ -59,7 +62,7 @@ public class IngredientControllerTest {
     @Test
     public void shouldReturnBadRequestForMismatchedId() {
         testClient.put().uri("/api/ingredients/FLTO")
-            .bodyValue(new Ingredient("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
+            .bodyValue(request("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
             .exchange()
             .expectStatus().isBadRequest();
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
@@ -69,7 +72,7 @@ public class IngredientControllerTest {
     public void shouldReturnNotFoundForNonexistentIngredient() {
         Mockito.when(repo.findById("LFTO")).thenReturn(Mono.empty());
         testClient.put().uri("/api/ingredients/LFTO")
-            .bodyValue(new Ingredient("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
+            .bodyValue(request("LFTO", "Lettuce", Ingredient.Type.VEGGIES))
             .exchange()
             .expectStatus().isNotFound();
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
@@ -84,11 +87,14 @@ public class IngredientControllerTest {
         Mockito.when(repo.findById("FLTO")).thenReturn(Mono.just(ingredient));
         Mockito.when(repo.save(Mockito.any(Ingredient.class))).thenReturn(saveProbe.mono());
 
-        Mono<ResponseEntity<Ingredient>> responseMono = controller.updateIngredient("FLTO", ingredient);
+        Mono<ResponseEntity<IngredientResponse>> responseMono = controller.updateIngredient(
+            "FLTO", request("FLTO", "Flour Tortilla", Ingredient.Type.WRAP));
 
 
         StepVerifier.create(responseMono)
-            .expectNextMatches(response -> response.getStatusCode().is2xxSuccessful() && response.getBody().equals(ingredient))
+            .expectNextMatches(response -> response.getStatusCode().is2xxSuccessful()
+                && response.getBody().equals(new IngredientResponse(
+                    "FLTO", "Flour Tortilla", Ingredient.Type.WRAP)))
             .verifyComplete();
 
         saveProbe.assertWasSubscribed();
@@ -129,7 +135,7 @@ public class IngredientControllerTest {
             .thenReturn(Mono.just(ingredient));
 
         testClient.post().uri("/api/ingredients")
-            .bodyValue(ingredient)
+            .bodyValue(request("PICK", "Pickle", Ingredient.Type.VEGGIES))
             .exchange()
             .expectStatus().isCreated()
             .expectHeader().valueMatches("Location", ".*/api/ingredients/PICK")
@@ -146,13 +152,22 @@ public class IngredientControllerTest {
 
     @Test
     public void shouldReturnBadRequestForInvalidIngredient() {
-        Ingredient invalidIngredient = new Ingredient("", "", null);
+        IngredientRequest invalidIngredient = request("", "", null);
 
         testClient.post().uri("/api/ingredients")
             .bodyValue(invalidIngredient)
             .exchange()
             .expectStatus().isBadRequest();
         Mockito.verify(repo, Mockito.times(0)).save(Mockito.any(Ingredient.class));
+    }
+
+    private IngredientRequest request(
+        String id, String name, Ingredient.Type type) {
+        IngredientRequest request = new IngredientRequest();
+        request.setId(id);
+        request.setName(name);
+        request.setType(type);
+        return request;
     }
 
 }

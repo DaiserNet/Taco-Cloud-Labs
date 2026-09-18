@@ -24,6 +24,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
+import tacos.api.dto.IngredientRequest;
+import tacos.api.dto.IngredientResponse;
+import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 @RestController
@@ -32,57 +35,58 @@ import tacos.data.IngredientRepository;
 public class IngredientController {
 
   private IngredientRepository repo;
+  private IngredientMapper ingredientMapper;
 
   @Autowired
-  public IngredientController(IngredientRepository repo) {
+  public IngredientController(IngredientRepository repo, IngredientMapper ingredientMapper) {
     this.repo = repo;
+    this.ingredientMapper = ingredientMapper;
   }
 
   @GetMapping
-  public Flux<Ingredient> allIngredients() {
-    return repo.findAll();
+  public Flux<IngredientResponse> allIngredients() {
+    return repo.findAll().map(ingredientMapper::toResponse);
   }
 
   @GetMapping("/{id}")
-  public Mono<Ingredient> byId(@PathVariable String id) {
-    return repo.findById(id);
+  public Mono<IngredientResponse> byId(@PathVariable String id) {
+    return repo.findById(id).map(ingredientMapper::toResponse);
   }
 
   @PutMapping("/{id}")
-  public Mono<ResponseEntity<Ingredient>> updateIngredient(@PathVariable String id, @RequestBody Ingredient ingredient) {
-    if (!ingredient.getId().equals(id)) {
-      // throw new IllegalStateException("Given ingredient's ID doesn't match the ID in the path.");
+  public Mono<ResponseEntity<IngredientResponse>> updateIngredient(
+      @PathVariable String id, @Valid @RequestBody IngredientRequest request) {
+    if (!id.equals(request.getId())) {
       return Mono.just(ResponseEntity.badRequest().build());
     }
 
     return repo.findById(id).flatMap(existingIngredient -> {
-      existingIngredient.setName(ingredient.getName());
-      existingIngredient.setType(ingredient.getType());
+      ingredientMapper.updateEntity(request, existingIngredient);
       return repo.save(existingIngredient);
     })
-        .map(updatedIngredient -> ResponseEntity.ok(updatedIngredient))
+        .map(ingredientMapper::toResponse)
+        .map(ResponseEntity::ok)
         .defaultIfEmpty(ResponseEntity.notFound().build());
   }
 
   @PostMapping
-  public Mono<ResponseEntity<Ingredient>> postIngredient(@Valid @RequestBody Ingredient ingredient, UriComponentsBuilder uriBuilder) {
-
-    return Mono.just(ingredient)
-        .flatMap(repo::save)
-        .map(i -> {
+  public Mono<ResponseEntity<IngredientResponse>> postIngredient(
+      @Valid @RequestBody IngredientRequest request, UriComponentsBuilder uriBuilder) {
+    return repo.save(ingredientMapper.toEntity(request))
+        .map(ingredient -> {
           URI location = uriBuilder
               .path("/api/ingredients/{id}")
-              .buildAndExpand(i.getId())
+              .buildAndExpand(ingredient.getId())
               .toUri();
-          return ResponseEntity.created(location).body(i);
+          return ResponseEntity.created(location)
+              .body(ingredientMapper.toResponse(ingredient));
         });
   }
 
   @DeleteMapping("/{id}")
-  public Mono<ResponseEntity<Ingredient>> deleteIngredient(@PathVariable String id) {
-    // repo.deleteById(id);
+  public Mono<ResponseEntity<Void>> deleteIngredient(@PathVariable String id) {
     return repo.findById(id).flatMap(existingIngredient -> repo.delete(existingIngredient)
-        .thenReturn(ResponseEntity.noContent().<Ingredient>build()))
+        .thenReturn(ResponseEntity.noContent().<Void>build()))
     .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
   }
 

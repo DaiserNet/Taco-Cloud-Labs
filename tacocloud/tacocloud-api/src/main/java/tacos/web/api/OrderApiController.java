@@ -26,6 +26,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.OrderStatus;
 import tacos.TacoOrder;
+import tacos.api.dto.OrderCreateRequest;
+import tacos.api.dto.OrderResponse;
+import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
@@ -38,89 +41,102 @@ public class OrderApiController {
   private OrderRepository repo;
   private OrderMessagingService orderMessages;
   private EmailOrderService emailOrderService;
+  private OrderMapper orderMapper;
 
   private Validator validator;
 
   public OrderApiController(OrderRepository repo,
                             OrderMessagingService orderMessages,
                             EmailOrderService emailOrderService,
-                            Validator validator) {
+                            Validator validator,
+                            OrderMapper orderMapper) {
     this.repo = repo;
     this.orderMessages = orderMessages;
     this.emailOrderService = emailOrderService;
     this.validator = validator;
+    this.orderMapper = orderMapper;
   }
 
   @GetMapping(produces="application/json")
-  public Flux<TacoOrder> allOrders() {
-    return repo.findAll();
+  public Flux<OrderResponse> allOrders() {
+    return repo.findAll().map(orderMapper::toResponse);
   }
 
   @PostMapping(consumes="application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<TacoOrder> postOrder(@RequestBody TacoOrder order) {
+  public Mono<OrderResponse> postOrder(@Valid @RequestBody OrderCreateRequest request) {
+    TacoOrder order = orderMapper.toEntity(request);
     orderMessages.sendOrder(order);
-    return repo.save(order);
+    return repo.save(order).map(orderMapper::toResponse);
   }
 
   @PostMapping(path="fromEmail", consumes="application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<TacoOrder> postOrderFromEmail(@Valid @RequestBody EmailOrder emailOrder) {
+  public Mono<OrderResponse> postOrderFromEmail(@Valid @RequestBody EmailOrder emailOrder) {
     return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
         .flatMap(repo::save)
         .flatMap(savedOrder -> Mono.fromRunnable(
             () -> orderMessages.sendOrder(savedOrder))
-            .thenReturn(savedOrder));
+            .thenReturn(savedOrder))
+        .map(orderMapper::toResponse);
   }
 
   @PutMapping(path="/{orderId}", consumes="application/json")
-  public Mono<ResponseEntity<TacoOrder>> putOrder(
+  public Mono<ResponseEntity<OrderResponse>> putOrder(
       @PathVariable("orderId") String orderId,
       @Valid @RequestBody OrderReplaceRequest replacement,
       Authentication authentication) {
     if (isUnauthenticated(authentication)) {
-      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .<OrderResponse>build());
     }
 
     return Mono.defer(() -> repo.findById(orderId)
         .flatMap(order -> {
           if (!isOwnerOrAdmin(order, authentication)) {
             return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .<TacoOrder>build());
+                .<OrderResponse>build());
           }
           if (!isEditable(order)) {
             return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT)
-                .<TacoOrder>build());
+                .<OrderResponse>build());
           }
 
           replacement.applyTo(order);
-          return repo.save(order).map(ResponseEntity::ok);
+          return repo.save(order)
+              .map(orderMapper::toResponse)
+              .map(ResponseEntity::ok);
         }))
         .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
   }
 
   @PatchMapping(path="/{orderId}", consumes="application/json")
-  public Mono<ResponseEntity<TacoOrder>> patchOrder(@PathVariable("orderId") String orderId,
+  public Mono<ResponseEntity<OrderResponse>> patchOrder(@PathVariable("orderId") String orderId,
                           @Valid @RequestBody OrderPatchRequest patch,
                           Authentication authentication) {
     
     if (isUnauthenticated(authentication)) {
-      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).<TacoOrder>build());
+      return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .<OrderResponse>build());
     }
     
     return repo.findById(orderId).flatMap(order -> {
       if (!isOwnerOrAdmin(order, authentication)) {
-        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).<TacoOrder>build());
+        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .<OrderResponse>build());
       }
       
       applyPatch(order, patch);
       Set<ConstraintViolation<TacoOrder>> violations = validator.validate(order);
 
       if(!violations.isEmpty()) {
-        return Mono.just(ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).<TacoOrder>build());
+        return Mono.just(ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+            .<OrderResponse>build());
       }
 
-      return repo.save(order).map(ResponseEntity::ok);
+      return repo.save(order)
+          .map(orderMapper::toResponse)
+          .map(ResponseEntity::ok);
     }).switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
   }
 

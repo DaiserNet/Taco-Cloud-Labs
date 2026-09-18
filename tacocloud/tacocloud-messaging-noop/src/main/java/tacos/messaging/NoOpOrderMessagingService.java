@@ -11,7 +11,9 @@ public class NoOpOrderMessagingService
        implements OrderMessagingService {
   
   public void sendOrder(TacoOrder order) {
-    log.info("Sending order to kitchen: " + order);
+    int tacoCount = order.getTacos() == null ? 0 : order.getTacos().size();
+    log.info("Sending order to kitchen: orderId={}, tacoCount={}",
+        order.getId(), tacoCount);
   }
   
 }

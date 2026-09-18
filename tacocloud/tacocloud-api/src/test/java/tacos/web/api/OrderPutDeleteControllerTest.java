@@ -39,6 +39,8 @@ import tacos.OrderStatus;
 import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.User;
+import tacos.api.dto.OrderResponse;
+import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
@@ -61,7 +63,8 @@ class OrderPutDeleteControllerTest {
 
   @BeforeEach
   void setUp() {
-    controller = new OrderApiController(repo, orderMessages, emailOrderService, validator);
+    controller = new OrderApiController(
+        repo, orderMessages, emailOrderService, validator, new OrderMapper());
   }
 
   @Test
@@ -83,18 +86,18 @@ class OrderPutDeleteControllerTest {
     StepVerifier.create(controller.putOrder("ORDER1", replacement, userAuthentication("habuma")))
         .assertNext(response -> {
           assertEquals(HttpStatus.OK, response.getStatusCode());
-          TacoOrder saved = response.getBody();
+          OrderResponse saved = response.getBody();
           assertEquals("New name", saved.getDeliveryName());
           assertEquals("New street", saved.getDeliveryStreet());
           assertEquals("New city", saved.getDeliveryCity());
           assertEquals("CA", saved.getDeliveryState());
           assertEquals("90210", saved.getDeliveryZip());
-          assertSame(existing.getUser(), saved.getUser());
-          assertSame(placedAt, saved.getPlacedAt());
-          assertEquals("4111111111111111", saved.getCcNumber());
-          assertEquals("123", saved.getCcCVV());
-          assertEquals("12/30", saved.getCcExpiration());
-          assertSame(existing.getTacos(), saved.getTacos());
+          assertEquals("1111", saved.getPaymentLast4());
+          assertSame(placedAt, existing.getPlacedAt());
+          assertEquals("4111111111111111", existing.getCcNumber());
+          assertEquals("123", existing.getCcCVV());
+          assertEquals("12/30", existing.getCcExpiration());
+          assertSame(taco, existing.getTacos().get(0));
         })
         .verifyComplete();
 

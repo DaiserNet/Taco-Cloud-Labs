@@ -33,10 +33,11 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
 import tacos.User;
+import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
-@ContextConfiguration(classes = OrderApiController.class)
+@ContextConfiguration(classes = {OrderApiController.class, OrderMapper.class})
 @WebFluxTest(controllers = OrderApiController.class)
 public class OrderApiControllerTest {
     

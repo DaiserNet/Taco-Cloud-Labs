@@ -33,6 +33,7 @@ import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
 import reactor.test.publisher.TestPublisher;
 import tacos.TacoOrder;
+import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
@@ -49,7 +50,7 @@ class OrderFromEmailControllerTest {
     messaging = mock(OrderMessagingService.class);
     emailOrderService = mock(EmailOrderService.class);
     controller = new OrderApiController(
-        repo, messaging, emailOrderService, mock(Validator.class));
+        repo, messaging, emailOrderService, mock(Validator.class), new OrderMapper());
   }
 
   @Test
