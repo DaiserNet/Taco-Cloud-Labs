@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
+import tacos.security.RegistrationConflictException;
 import tacos.web.api.EmailOrderConversionException;
 
 @RestControllerAdvice
@@ -114,6 +115,14 @@ public class ApiExceptionHandler {
       EmailOrderConversionException error, HttpServletRequest request) {
     return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Business rule violation",
         error.getMessage(), error.getCode(), Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(RegistrationConflictException.class)
+  public ResponseEntity<ApiProblem> handleRegistrationConflict(
+      RegistrationConflictException error, HttpServletRequest request) {
+    return problem(HttpStatus.CONFLICT, "User registration conflict",
+        "The username or email is already registered.", "USER_ALREADY_EXISTS",
+        Collections.emptyList(), request);
   }
 
   @ExceptionHandler(DataAccessException.class)

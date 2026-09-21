@@ -10,10 +10,10 @@ import org.springframework.security.core.authority.
                                           SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import lombok.AccessLevel;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.ToString;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
 // @NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
@@ -28,6 +28,8 @@ public class User implements UserDetails {
   
   private final String username;
   
+  @JsonIgnore
+  @ToString.Exclude
   private final String password;
   private final String fullname;
   private final String street;

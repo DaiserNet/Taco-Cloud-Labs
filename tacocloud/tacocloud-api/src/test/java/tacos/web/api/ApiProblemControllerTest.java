@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.security.Principal;
@@ -42,6 +43,10 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.security.RegistrationConflictException;
+import tacos.security.RegistrationController;
+import tacos.security.RegistrationForm;
+import tacos.security.RegistrationService;
 
 class ApiProblemControllerTest {
 
@@ -49,6 +54,7 @@ class ApiProblemControllerTest {
   private IngredientRepository ingredientRepo;
   private OrderMessagingService messaging;
   private EmailOrderService emailOrderService;
+  private RegistrationService registrationService;
   private MockMvc mvc;
 
   @BeforeEach
@@ -57,10 +63,12 @@ class ApiProblemControllerTest {
     ingredientRepo = mock(IngredientRepository.class);
     messaging = mock(OrderMessagingService.class);
     emailOrderService = mock(EmailOrderService.class);
+    registrationService = mock(RegistrationService.class);
     OrderApiController orderController = new OrderApiController(
         orderRepo, messaging, emailOrderService, mock(Validator.class), new OrderMapper());
     mvc = MockMvcBuilders.standaloneSetup(
-        orderController, new IngredientController(ingredientRepo, new IngredientMapper()))
+        orderController, new IngredientController(ingredientRepo, new IngredientMapper()),
+        new RegistrationController(registrationService))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }
@@ -155,6 +163,27 @@ class ApiProblemControllerTest {
         .andExpect(jsonPath("$.detail").value("An internal data access error occurred."))
         .andExpect(jsonPath("$.stackTrace").doesNotExist())
         .andExpect(content().string(not(containsString("MongoDB driver secret detail"))));
+  }
+
+  @Test
+  void shouldReturnConflictProblemForDuplicateRegistration() throws Exception {
+    when(registrationService.register(any(RegistrationForm.class)))
+        .thenReturn(Mono.error(new RegistrationConflictException()));
+
+    MvcResult pending = mvc.perform(post("/register")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .accept(MediaType.APPLICATION_PROBLEM_JSON)
+            .param("username", "alice")
+            .param("password", "correct horse battery staple")
+            .param("email", "alice@example.test"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mvc.perform(MockMvcRequestBuilders.asyncDispatch(pending))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("USER_ALREADY_EXISTS"))
+        .andExpect(jsonPath("$.instance").value("/register"));
   }
 
   private ResultActions perform(
