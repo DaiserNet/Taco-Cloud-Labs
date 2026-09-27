@@ -1,6 +1,10 @@
 package tacos;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceConstructor;
@@ -11,13 +15,14 @@ import org.springframework.security.core.authority.
 import org.springframework.security.core.userdetails.UserDetails;
 
 import lombok.Data;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
-// @NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
-// @RequiredArgsConstructor
+@NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
 @Document
 public class User implements UserDetails {
 
@@ -38,11 +43,20 @@ public class User implements UserDetails {
   private final String zip;
   private final String phoneNumber;
   private final String email;
-  
-  @PersistenceConstructor 
+
+  private final Set<String> roles;
+
   public User(String username, String password, String fullname, String street,
               String city, String state, String zip, String phoneNumber,
               String email) {
+    this(username, password, fullname, street, city, state, zip, phoneNumber,
+        email, Collections.singleton("USER"));
+  }
+
+  @PersistenceConstructor
+  public User(String username, String password, String fullname, String street,
+              String city, String state, String zip, String phoneNumber,
+              String email, Set<String> roles) {
     this.username = username;
     this.password = password;
     this.fullname = fullname;
@@ -52,11 +66,18 @@ public class User implements UserDetails {
     this.zip = zip;
     this.phoneNumber = phoneNumber;
     this.email = email;
+    this.roles = roles == null || roles.isEmpty()
+        ? Collections.singleton("USER")
+        : Collections.unmodifiableSet(new LinkedHashSet<>(roles));
   }
 
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));
+    return roles.stream()
+        .map(role -> role.toUpperCase(Locale.ROOT))
+        .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+        .map(SimpleGrantedAuthority::new)
+        .collect(Collectors.toList());
   }
 
   @Override

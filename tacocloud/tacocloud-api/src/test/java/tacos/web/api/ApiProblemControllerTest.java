@@ -42,6 +42,7 @@ import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
+import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 import tacos.security.RegistrationConflictException;
 import tacos.security.RegistrationController;
@@ -54,6 +55,7 @@ class ApiProblemControllerTest {
   private IngredientRepository ingredientRepo;
   private OrderMessagingService messaging;
   private EmailOrderService emailOrderService;
+  private UserRepository userRepo;
   private RegistrationService registrationService;
   private MockMvc mvc;
 
@@ -63,9 +65,12 @@ class ApiProblemControllerTest {
     ingredientRepo = mock(IngredientRepository.class);
     messaging = mock(OrderMessagingService.class);
     emailOrderService = mock(EmailOrderService.class);
+    userRepo = mock(UserRepository.class);
     registrationService = mock(RegistrationService.class);
+    OrderService orderService = new OrderService(orderRepo, emailOrderService,
+        messaging, userRepo, mock(Validator.class));
     OrderApiController orderController = new OrderApiController(
-        orderRepo, messaging, emailOrderService, mock(Validator.class), new OrderMapper());
+        orderService, new OrderMapper());
     mvc = MockMvcBuilders.standaloneSetup(
         orderController, new IngredientController(ingredientRepo, new IngredientMapper()),
         new RegistrationController(registrationService))
@@ -142,7 +147,8 @@ class ApiProblemControllerTest {
 
     perform(post("/api/orders/fromEmail").content(
         "{\"email\":\"owner@example.test\",\"tacos\":["
-            + "{\"name\":\"Valid taco\",\"ingredients\":[\"UNKNOWN\"]}]}"), null)
+        + "{\"name\":\"Valid taco\",\"ingredients\":[\"UNKNOWN\"]}]}"),
+        user("owner"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.code").value("EMAIL_ORDER_INGREDIENT_NOT_FOUND"))

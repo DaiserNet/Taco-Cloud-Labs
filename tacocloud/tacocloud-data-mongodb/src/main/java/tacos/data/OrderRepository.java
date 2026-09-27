@@ -13,4 +13,6 @@ public interface OrderRepository
   Flux<TacoOrder> findByUserOrderByPlacedAtDesc(
           User user, Pageable pageable);
 
+  Flux<TacoOrder> findByUserUsernameOrderByPlacedAtDesc(String username);
+
 }

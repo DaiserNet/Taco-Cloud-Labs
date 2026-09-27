@@ -39,9 +39,12 @@ import tacos.User;
 import tacos.api.error.ApiExceptionHandler;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
+import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 
-@ContextConfiguration(classes = {OrderApiController.class, OrderMapper.class})
+@ContextConfiguration(classes = {
+    OrderApiController.class, OrderService.class, OrderMapper.class
+})
 @WebFluxTest(controllers = OrderApiController.class)
 public class OrderApiControllerTest {
     
@@ -62,6 +65,9 @@ public class OrderApiControllerTest {
 
     @MockBean
     private EmailOrderService emailOrderService;
+
+    @MockBean
+    private UserRepository userRepo;
 
     @Test 
     public void shouldPatchZipWithoutChangingState() {

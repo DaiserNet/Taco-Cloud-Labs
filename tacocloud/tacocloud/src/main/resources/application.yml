@@ -65,14 +65,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
+        include: health,info
 #end::exposeAll[]
-        exclude: threaddump,heapdump
 #end::excludeSome[]
 #tag::healthShowDetails[]
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
+      roles: ADMIN
 #end::healthShowDetails[]
 #tag::infoGitModeFull[]
   info:
@@ -86,6 +86,10 @@ info:
     email: support@tacocloud.com
     phone: 822-625-6831
 #end::contactInfo[]
+
+tacocloud:
+  api:
+    allowed-origins: ${TACOCLOUD_API_ALLOWED_ORIGINS:http://localhost:8080}
 
 ---
 spring:

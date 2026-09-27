@@ -43,6 +43,7 @@ import tacos.User;
 import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
+import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,12 +61,16 @@ class OrderPutDeleteControllerTest {
   @Mock
   private Validator validator;
 
+  @Mock
+  private UserRepository userRepo;
+
   private OrderApiController controller;
 
   @BeforeEach
   void setUp() {
-    controller = new OrderApiController(
-        repo, orderMessages, emailOrderService, validator, new OrderMapper());
+    OrderService orderService = new OrderService(
+        repo, emailOrderService, orderMessages, userRepo, validator);
+    controller = new OrderApiController(orderService, new OrderMapper());
   }
 
   @Test

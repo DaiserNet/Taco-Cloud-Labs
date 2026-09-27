@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
+import java.util.Collections;
 
 import javax.validation.Validator;
 
@@ -24,6 +25,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -33,8 +37,10 @@ import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
 import reactor.test.publisher.TestPublisher;
 import tacos.TacoOrder;
+import tacos.User;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
+import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 
 class OrderFromEmailControllerTest {
@@ -42,6 +48,7 @@ class OrderFromEmailControllerTest {
   private OrderRepository repo;
   private OrderMessagingService messaging;
   private EmailOrderService emailOrderService;
+  private UserRepository userRepo;
   private OrderApiController controller;
 
   @BeforeEach
@@ -49,13 +56,15 @@ class OrderFromEmailControllerTest {
     repo = mock(OrderRepository.class);
     messaging = mock(OrderMessagingService.class);
     emailOrderService = mock(EmailOrderService.class);
-    controller = new OrderApiController(
-        repo, messaging, emailOrderService, mock(Validator.class), new OrderMapper());
+    userRepo = mock(UserRepository.class);
+    OrderService orderService = new OrderService(
+        repo, emailOrderService, messaging, userRepo, mock(Validator.class));
+    controller = new OrderApiController(orderService, new OrderMapper());
   }
 
   @Test
   void shouldSubscribeToColdConversionOnceAndPublishSavedOrderOnce() {
-    TacoOrder converted = new TacoOrder();
+    TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     saved.setId("ORDER-ID");
     PublisherProbe<TacoOrder> conversion = PublisherProbe.of(Mono.just(converted));
@@ -63,7 +72,7 @@ class OrderFromEmailControllerTest {
         .thenReturn(conversion.mono());
     when(repo.save(converted)).thenReturn(Mono.just(saved));
 
-    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder()))
+    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .assertNext(order -> assertEquals("ORDER-ID", order.getId()))
         .verifyComplete();
 
@@ -80,7 +89,7 @@ class OrderFromEmailControllerTest {
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
         .thenReturn(Mono.error(new InvalidEmailOrderException("invalid email order")));
 
-    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder()))
+    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .expectError(InvalidEmailOrderException.class)
         .verify();
 
@@ -90,13 +99,13 @@ class OrderFromEmailControllerTest {
 
   @Test
   void shouldNotPublishWhenSaveFails() {
-    TacoOrder converted = new TacoOrder();
+    TacoOrder converted = convertedOrder();
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
         .thenReturn(Mono.just(converted));
     when(repo.save(converted))
         .thenReturn(Mono.error(new IllegalStateException("save failed")));
 
-    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder()))
+    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .expectErrorMatches(error -> error instanceof IllegalStateException
             && "save failed".equals(error.getMessage()))
         .verify();
@@ -106,7 +115,7 @@ class OrderFromEmailControllerTest {
 
   @Test
   void shouldWaitForSaveBeforePublishing() {
-    TacoOrder converted = new TacoOrder();
+    TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     saved.setId("ORDER-ID");
     TestPublisher<TacoOrder> save = TestPublisher.createCold();
@@ -114,7 +123,7 @@ class OrderFromEmailControllerTest {
         .thenReturn(Mono.just(converted));
     when(repo.save(converted)).thenReturn(save.mono());
 
-    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder()))
+    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .expectSubscription()
         .then(() -> verifyNoInteractions(messaging))
         .expectNoEvent(Duration.ofMillis(20))
@@ -127,7 +136,7 @@ class OrderFromEmailControllerTest {
 
   @Test
   void shouldPropagatePublishFailureInsteadOfCompletingSuccessfully() {
-    TacoOrder converted = new TacoOrder();
+    TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
         .thenReturn(Mono.just(converted));
@@ -135,7 +144,7 @@ class OrderFromEmailControllerTest {
     doThrow(new IllegalStateException("send failed"))
         .when(messaging).sendOrder(saved);
 
-    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder()))
+    StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .expectErrorMatches(error -> error instanceof IllegalStateException
             && "send failed".equals(error.getMessage()))
         .verify();
@@ -146,7 +155,7 @@ class OrderFromEmailControllerTest {
 
   @Test
   void shouldReturnCreatedWithThePersistedOrder() throws Exception {
-    TacoOrder converted = new TacoOrder();
+    TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     saved.setId("ORDER-ID");
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
@@ -155,6 +164,7 @@ class OrderFromEmailControllerTest {
     MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
     MvcResult result = mvc.perform(post("/api/orders/fromEmail")
+            .principal(user())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"email\":\"owner@example.test\",\"tacos\":["
                 + "{\"name\":\"Valid taco\",\"ingredients\":[\"WRAP\"]}]}"))
@@ -165,5 +175,17 @@ class OrderFromEmailControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value("ORDER-ID"));
     verify(messaging).sendOrder(saved);
+  }
+
+  private TacoOrder convertedOrder() {
+    TacoOrder order = new TacoOrder();
+    order.setUser(new User("alice", "N/A", "Alice", "Street", "City", "ST",
+        "00000", "0000000000", "alice@example.test"));
+    return order;
+  }
+
+  private Authentication user() {
+    return new UsernamePasswordAuthenticationToken("alice", "N/A",
+        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
   }
 }

@@ -3,7 +3,6 @@ package tacos.web.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -12,8 +11,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Set;
-
-import javax.validation.Validator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +21,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import tacos.Ingredient;
 import tacos.Ingredient.Type;
 import tacos.OrderStatus;
@@ -36,22 +32,16 @@ import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
-import tacos.data.OrderRepository;
-import tacos.messaging.OrderMessagingService;
 
 class ApiDtoContractTest {
 
-  private OrderRepository repo;
-  private OrderMessagingService messaging;
+  private OrderService orderService;
   private WebTestClient client;
 
   @BeforeEach
   void setUp() {
-    repo = mock(OrderRepository.class);
-    messaging = mock(OrderMessagingService.class);
-    OrderApiController controller = new OrderApiController(
-        repo, messaging, mock(EmailOrderService.class), mock(Validator.class),
-        new OrderMapper());
+    orderService = mock(OrderService.class);
+    OrderApiController controller = new OrderApiController(orderService, new OrderMapper());
     client = WebTestClient.bindToController(controller).build();
   }
 
@@ -66,7 +56,7 @@ class ApiDtoContractTest {
     order.setCcNumber("4111111111111111");
     order.setCcExpiration("12/99");
     order.setCcCVV("123");
-    when(repo.findAll()).thenReturn(Flux.just(order));
+    when(orderService.findVisibleOrders(null)).thenReturn(Flux.just(order));
 
     client.get().uri("/api/orders").exchange()
         .expectStatus().isOk()
@@ -84,9 +74,6 @@ class ApiDtoContractTest {
 
   @Test
   void shouldRejectOrderServerOwnedFieldsWithoutEffects() {
-    when(repo.save(any(TacoOrder.class)))
-        .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-
     client.post().uri("/api/orders")
         .contentType(MediaType.APPLICATION_JSON)
         .bodyValue("{\"id\":\"CLIENT-ID\",\"deliveryName\":\"Client\","
@@ -94,7 +81,7 @@ class ApiDtoContractTest {
         .exchange()
         .expectStatus().isBadRequest();
 
-    verifyNoInteractions(repo, messaging);
+    verifyNoInteractions(orderService);
   }
 
   @Test
