@@ -8,4 +8,6 @@ import tacos.PaymentMethod;
 public interface PaymentMethodRepository 
          extends ReactiveCrudRepository<PaymentMethod, String> {
   Mono<PaymentMethod> findByUserId(String userId);
+
+  Mono<PaymentMethod> findByIdAndUserUsername(String id, String username);
 }

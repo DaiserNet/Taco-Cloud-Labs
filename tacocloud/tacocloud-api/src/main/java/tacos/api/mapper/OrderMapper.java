@@ -22,9 +22,7 @@ public class OrderMapper {
     order.setDeliveryCity(request.getDeliveryCity());
     order.setDeliveryState(request.getDeliveryState());
     order.setDeliveryZip(request.getDeliveryZip());
-    order.setCcNumber(request.getCcNumber());
-    order.setCcExpiration(request.getCcExpiration());
-    order.setCcCVV(request.getCcCVV());
+    order.setPaymentMethodId(request.getPaymentMethodId());
     order.setTacos(safe(request.getTacos()).stream()
         .map(this::toEntityTaco)
         .collect(Collectors.toList()));
@@ -42,7 +40,8 @@ public class OrderMapper {
     response.setDeliveryCity(order.getDeliveryCity());
     response.setDeliveryState(order.getDeliveryState());
     response.setDeliveryZip(order.getDeliveryZip());
-    response.setPaymentLast4(lastFour(order.getCcNumber()));
+    response.setPaymentBrand(order.getPaymentBrand());
+    response.setPaymentLast4(order.getPaymentLast4());
     response.setTacos(safe(order.getTacos()).stream()
         .map(this::toResponseTaco)
         .collect(Collectors.toList()));
@@ -74,13 +73,6 @@ public class OrderMapper {
         .map(ingredient -> ingredient == null ? null : ingredient.getId())
         .collect(Collectors.toList()));
     return response;
-  }
-
-  private String lastFour(String value) {
-    if (value == null) {
-      return null;
-    }
-    return value.length() <= 4 ? value : value.substring(value.length() - 4);
   }
 
   private <T> List<T> safe(List<T> values) {

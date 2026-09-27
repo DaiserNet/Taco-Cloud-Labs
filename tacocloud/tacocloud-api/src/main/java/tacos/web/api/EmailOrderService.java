@@ -93,9 +93,9 @@ public class EmailOrderService {
   private TacoOrder buildOrder(User user, PaymentMethod paymentMethod, List<Taco> tacos) {
     TacoOrder order = new TacoOrder();
     order.setUser(user);
-    order.setCcNumber(paymentMethod.getCcNumber());
-    order.setCcCVV(paymentMethod.getCcCVV());
-    order.setCcExpiration(paymentMethod.getCcExpiration());
+    order.setPaymentMethodId(paymentMethod.getId());
+    order.setPaymentBrand(paymentMethod.getBrand());
+    order.setPaymentLast4(paymentMethod.getLast4());
     order.setDeliveryName(user.getFullname());
     order.setDeliveryStreet(user.getStreet());
     order.setDeliveryCity(user.getCity());

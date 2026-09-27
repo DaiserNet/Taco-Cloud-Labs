@@ -37,16 +37,8 @@ public class OrderCreateRequest {
   private String deliveryZip;
 
   @NotBlank(message = "must not be blank")
-  @Pattern(regexp = "[0-9]{13,19}", message = "must contain between 13 and 19 digits")
-  private String ccNumber;
-
-  @NotBlank(message = "must not be blank")
-  @Pattern(regexp = "(0[1-9]|1[0-2])/\\d{2}", message = "must use MM/YY format")
-  private String ccExpiration;
-
-  @NotBlank(message = "must not be blank")
-  @Pattern(regexp = "\\d{3,4}", message = "must contain 3 or 4 digits")
-  private String ccCVV;
+  @Size(max = 64, message = "must contain at most 64 characters")
+  private String paymentMethodId;
 
   @NotNull(message = "must be provided")
   @Size(min = 1, max = 50, message = "must contain between 1 and 50 tacos")

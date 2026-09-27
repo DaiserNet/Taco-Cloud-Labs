@@ -69,7 +69,8 @@ class OrderPutDeleteControllerTest {
   @BeforeEach
   void setUp() {
     OrderService orderService = new OrderService(
-        repo, emailOrderService, orderMessages, userRepo, validator);
+        repo, emailOrderService, orderMessages, userRepo, validator,
+        org.mockito.Mockito.mock(tacos.payment.PaymentMethodService.class));
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 
@@ -80,9 +81,9 @@ class OrderPutDeleteControllerTest {
     Taco taco = new Taco();
     taco.setId("TACO1");
     existing.setPlacedAt(placedAt);
-    existing.setCcNumber("4111111111111111");
-    existing.setCcCVV("123");
-    existing.setCcExpiration("12/30");
+    existing.setPaymentMethodId("PAYMENT-ID");
+    existing.setPaymentBrand("VISA");
+    existing.setPaymentLast4("1111");
     existing.setTacos(Collections.singletonList(taco));
 
     OrderReplaceRequest replacement = replacement();
@@ -100,9 +101,9 @@ class OrderPutDeleteControllerTest {
           assertEquals("90210", saved.getDeliveryZip());
           assertEquals("1111", saved.getPaymentLast4());
           assertSame(placedAt, existing.getPlacedAt());
-          assertEquals("4111111111111111", existing.getCcNumber());
-          assertEquals("123", existing.getCcCVV());
-          assertEquals("12/30", existing.getCcExpiration());
+          assertEquals("PAYMENT-ID", existing.getPaymentMethodId());
+          assertEquals("VISA", existing.getPaymentBrand());
+          assertEquals("1111", existing.getPaymentLast4());
           assertSame(taco, existing.getTacos().get(0));
         })
         .verifyComplete();

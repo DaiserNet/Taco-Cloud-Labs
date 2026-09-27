@@ -17,6 +17,7 @@ public class OrderResponse {
   private String deliveryCity;
   private String deliveryState;
   private String deliveryZip;
+  private String paymentBrand;
   private String paymentLast4;
   private List<TacoItem> tacos;
 

@@ -41,6 +41,9 @@ class SecurityAuthorizationTest {
   void shouldRejectAnonymousOrderCreationWithUnauthorized() throws Exception {
     mvc.perform(post("/api/orders").with(csrf()).accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isUnauthorized());
+    mvc.perform(post("/api/payment-methods/tokenize").with(csrf())
+            .accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -48,6 +51,8 @@ class SecurityAuthorizationTest {
   void shouldAllowUserOrderAccess() throws Exception {
     mvc.perform(get("/api/orders")).andExpect(status().isOk());
     mvc.perform(post("/api/orders").with(csrf())).andExpect(status().isOk());
+    mvc.perform(post("/api/payment-methods/tokenize").with(csrf()))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -105,7 +110,8 @@ class SecurityAuthorizationTest {
       return "ok";
     }
 
-    @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue"})
+    @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
+        "/api/payment-methods/tokenize"})
     String write() {
       return "ok";
     }

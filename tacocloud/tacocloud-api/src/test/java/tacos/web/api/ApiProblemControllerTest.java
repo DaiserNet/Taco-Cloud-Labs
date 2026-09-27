@@ -68,7 +68,8 @@ class ApiProblemControllerTest {
     userRepo = mock(UserRepository.class);
     registrationService = mock(RegistrationService.class);
     OrderService orderService = new OrderService(orderRepo, emailOrderService,
-        messaging, userRepo, mock(Validator.class));
+        messaging, userRepo, mock(Validator.class),
+        mock(tacos.payment.PaymentMethodService.class));
     OrderApiController orderController = new OrderApiController(
         orderService, new OrderMapper());
     mvc = MockMvcBuilders.standaloneSetup(
@@ -92,7 +93,7 @@ class ApiProblemControllerTest {
         .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
         .andExpect(jsonPath("$.instance").value("/api/orders"))
         .andExpect(jsonPath("$.violations[*].field",
-            hasItems("deliveryName", "ccNumber", "tacos")));
+            hasItems("deliveryName", "paymentMethodId", "tacos")));
 
     verifyNoInteractions(orderRepo, messaging);
   }

@@ -54,7 +54,9 @@ public class DevelopmentConfig {
               order.setDeliveryState("TX");
               order.setDeliveryZip("76227");
               orderRepo.save(order).subscribe();
-              paymentMethodRepo.save(new PaymentMethod(user, "4111111111111111", "321", "10/25")).subscribe();
+              paymentMethodRepo.save(new PaymentMethod(user,
+                  "tok_fake_development_habuma", "VISA", "1111", "10/30"))
+                  .subscribe();
           });       
           
         
@@ -64,7 +66,9 @@ public class DevelopmentConfig {
               "Test User", "456 South Street", "Somewhere", "CA", 
               "90210", "987-654-3210", "testuser@test.com"))
           .subscribe(user -> {
-              paymentMethodRepo.save(new PaymentMethod(user, "55555555555555555", "123", "9/26")).subscribe();
+              paymentMethodRepo.save(new PaymentMethod(user,
+                  "tok_fake_development_testuser", "MASTERCARD", "5555", "09/30"))
+                  .subscribe();
           });
 
         Taco taco1 = new Taco();

@@ -53,9 +53,9 @@ class ApiDtoContractTest {
         "City", "ST", "00000", "0000000000", "owner@example.test");
     user.setId("USER-ID");
     order.setUser(user);
-    order.setCcNumber("4111111111111111");
-    order.setCcExpiration("12/99");
-    order.setCcCVV("123");
+    order.setPaymentMethodId("PAYMENT-ID");
+    order.setPaymentBrand("VISA");
+    order.setPaymentLast4("1111");
     when(orderService.findVisibleOrders(null)).thenReturn(Flux.just(order));
 
     client.get().uri("/api/orders").exchange()
@@ -63,6 +63,7 @@ class ApiDtoContractTest {
         .expectBody()
         .jsonPath("$[0].id").isEqualTo("ORDER-ID")
         .jsonPath("$[0].userId").isEqualTo("USER-ID")
+        .jsonPath("$[0].paymentBrand").isEqualTo("VISA")
         .jsonPath("$[0].paymentLast4").isEqualTo("1111")
         .jsonPath("$[0].user").doesNotExist()
         .jsonPath("$[0].password").doesNotExist()
@@ -92,9 +93,7 @@ class ApiDtoContractTest {
     request.setDeliveryCity("City");
     request.setDeliveryState("ST");
     request.setDeliveryZip("00000");
-    request.setCcNumber("4111111111111111");
-    request.setCcExpiration("12/99");
-    request.setCcCVV("123");
+    request.setPaymentMethodId("PAYMENT-ID");
     OrderCreateRequest.IngredientItem ingredient =
         new OrderCreateRequest.IngredientItem();
     ingredient.setId("WRAP");
@@ -111,7 +110,7 @@ class ApiDtoContractTest {
     assertNotNull(order.getPlacedAt());
     assertEquals(OrderStatus.PLACED, order.getStatus());
     assertEquals("Delivery Name", order.getDeliveryName());
-    assertEquals("4111111111111111", order.getCcNumber());
+    assertEquals("PAYMENT-ID", order.getPaymentMethodId());
     assertEquals("TACO-ID", order.getTacos().get(0).getId());
     assertEquals("WRAP", order.getTacos().get(0).getIngredients().get(0).getId());
     assertNull(order.getTacos().get(0).getIngredients().get(0).getName());
@@ -122,9 +121,9 @@ class ApiDtoContractTest {
     TacoOrder order = new TacoOrder();
     order.setId("ORDER-ID");
     order.setPlacedAt(new Date(0));
-    order.setCcNumber("4111111111111111");
-    order.setCcExpiration("12/99");
-    order.setCcCVV("123");
+    order.setPaymentMethodId("PAYMENT-ID");
+    order.setPaymentBrand("VISA");
+    order.setPaymentLast4("1111");
     User user = new User("owner", "secret", "Owner", "Street", "City", "ST",
         "00000", "0000000000", "owner@example.test");
     user.setId("USER-ID");
@@ -137,7 +136,8 @@ class ApiDtoContractTest {
 
     assertEquals(new LinkedHashSet<>(Arrays.asList(
         "id", "placedAt", "status", "userId", "deliveryName", "deliveryStreet",
-        "deliveryCity", "deliveryState", "deliveryZip", "paymentLast4", "tacos")),
+        "deliveryCity", "deliveryState", "deliveryZip", "paymentBrand",
+        "paymentLast4", "tacos")),
         actualFields);
     assertEquals("USER-ID", json.get("userId").asText());
     assertEquals("1111", json.get("paymentLast4").asText());

@@ -41,6 +41,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.payment.PaymentMethodService;
 
 @ContextConfiguration(classes = {
     OrderApiController.class, OrderService.class, OrderMapper.class
@@ -68,6 +69,9 @@ public class OrderApiControllerTest {
 
     @MockBean
     private UserRepository userRepo;
+
+    @MockBean
+    private PaymentMethodService paymentMethodService;
 
     @Test 
     public void shouldPatchZipWithoutChangingState() {

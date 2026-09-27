@@ -19,6 +19,7 @@ import tacos.User;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.payment.PaymentMethodService;
 
 @Service
 public class OrderService {
@@ -28,15 +29,17 @@ public class OrderService {
   private final OrderMessagingService orderMessages;
   private final UserRepository userRepo;
   private final Validator validator;
+  private final PaymentMethodService paymentMethodService;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
       OrderMessagingService orderMessages, UserRepository userRepo,
-      Validator validator) {
+      Validator validator, PaymentMethodService paymentMethodService) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
     this.orderMessages = orderMessages;
     this.userRepo = userRepo;
     this.validator = validator;
+    this.paymentMethodService = paymentMethodService;
   }
 
   public Flux<TacoOrder> findVisibleOrders(Authentication authentication) {
@@ -57,11 +60,15 @@ public class OrderService {
   public Mono<TacoOrder> createOrder(
       TacoOrder order, Authentication authentication) {
     return currentUser(authentication)
-        .flatMap(user -> {
-          order.setUser(user);
-          return Mono.fromRunnable(() -> orderMessages.sendOrder(order))
-              .then(Mono.defer(() -> repo.save(order)));
-        });
+        .flatMap(user -> paymentMethodService
+            .findOwned(order.getPaymentMethodId(), authentication)
+            .flatMap(payment -> {
+              order.setUser(user);
+              order.setPaymentBrand(payment.getBrand());
+              order.setPaymentLast4(payment.getLast4());
+              return Mono.fromRunnable(() -> orderMessages.sendOrder(order))
+                  .then(Mono.defer(() -> repo.save(order)));
+            }));
   }
 
   public Mono<TacoOrder> createFromEmail(

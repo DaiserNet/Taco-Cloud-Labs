@@ -46,7 +46,7 @@ class EmailOrderServiceTest {
     paymentRepo = mock(PaymentMethodRepository.class);
     service = new EmailOrderService(userRepo, ingredientRepo, paymentRepo);
     user = user("owner@example.test");
-    payment = new PaymentMethod(user, "4111111111111111", "123", "12/99");
+    payment = new PaymentMethod(user, "tok_test", "VISA", "0002", "12/99");
     payment.setId("PAYMENT-ID");
   }
 
@@ -69,9 +69,9 @@ class EmailOrderServiceTest {
     StepVerifier.create(service.convertEmailOrderToDomainOrder(Mono.just(email)))
         .assertNext(order -> {
           assertSame(user, order.getUser());
-          assertEquals("4111111111111111", order.getCcNumber());
-          assertEquals("123", order.getCcCVV());
-          assertEquals("12/99", order.getCcExpiration());
+          assertEquals("PAYMENT-ID", order.getPaymentMethodId());
+          assertEquals("VISA", order.getPaymentBrand());
+          assertEquals("0002", order.getPaymentLast4());
           assertEquals(Arrays.asList("First", "Second"), Arrays.asList(
               order.getTacos().get(0).getName(), order.getTacos().get(1).getName()));
           assertEquals(Arrays.asList(wrap, protein), order.getTacos().get(0).getIngredients());

@@ -24,11 +24,13 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import tacos.PaymentMethod;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.payment.PaymentMethodService;
 
 class OrderAuthorizationServiceTest {
 
@@ -36,6 +38,7 @@ class OrderAuthorizationServiceTest {
   private UserRepository userRepo;
   private EmailOrderService emailOrderService;
   private OrderMessagingService messaging;
+  private PaymentMethodService paymentMethodService;
   private OrderService service;
 
   @BeforeEach
@@ -44,8 +47,9 @@ class OrderAuthorizationServiceTest {
     userRepo = mock(UserRepository.class);
     emailOrderService = mock(EmailOrderService.class);
     messaging = mock(OrderMessagingService.class);
+    paymentMethodService = mock(PaymentMethodService.class);
     service = new OrderService(orderRepo, emailOrderService, messaging,
-        userRepo, mock(Validator.class));
+        userRepo, mock(Validator.class), paymentMethodService);
   }
 
   @Test
@@ -80,11 +84,22 @@ class OrderAuthorizationServiceTest {
   void shouldReplaceClientOwnerWithAuthenticatedUserBeforeCreate() {
     User authenticated = userDomain("alice");
     TacoOrder requested = order("CLIENT-ID", "attacker");
+    requested.setPaymentMethodId("PAYMENT-ID");
+    PaymentMethod payment = new PaymentMethod(
+        authenticated, "tok_test", "VISA", "0002", "12/99");
     when(userRepo.findByUsername("alice")).thenReturn(Mono.just(authenticated));
+    when(paymentMethodService.findOwned("PAYMENT-ID", user("alice")))
+        .thenReturn(Mono.just(payment));
     when(orderRepo.save(requested)).thenReturn(Mono.just(requested));
 
     StepVerifier.create(service.createOrder(requested, user("alice")))
-        .assertNext(saved -> assertSame(authenticated, saved.getUser()))
+        .assertNext(saved -> {
+          assertSame(authenticated, saved.getUser());
+          org.junit.jupiter.api.Assertions.assertEquals(
+              "VISA", saved.getPaymentBrand());
+          org.junit.jupiter.api.Assertions.assertEquals(
+              "0002", saved.getPaymentLast4());
+        })
         .verifyComplete();
 
     InOrder effects = inOrder(messaging, orderRepo);

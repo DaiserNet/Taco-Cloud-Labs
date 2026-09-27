@@ -183,9 +183,7 @@ public class DesignAndOrderTacosBrowserTest {
     fillField("input#deliveryCity", "Foodsville");
     fillField("input#deliveryState", "CO");
     fillField("input#deliveryZip", "81019");
-    fillField("input#ccNumber", "4111111111111111");
-    fillField("input#ccExpiration", "10/24");
-    fillField("input#ccCVV", "123");
+    fillField("input#paymentMethodId", "PAYMENT-ID");
     browser.findElementByCssSelector("form#orderForm").submit();
   }
 
@@ -203,17 +201,14 @@ public class DesignAndOrderTacosBrowserTest {
 
     List<String> validationErrors = getValidationErrorTexts();
     assertThat(validationErrors)
-        .hasSize(9)
+        .hasSize(6)
         .contains(
           "Please correct the problems below and resubmit.",
           "Delivery name is required",
           "Street is required",
           "City is required",
           "State is required",
-          "Zip code is required",
-          "Not a valid credit card number",
-          "Must be formatted MM/YY",
-          "Invalid CVV");
+          "Zip code is required");
   }
 
   private List<String> getValidationErrorTexts() {
@@ -231,21 +226,15 @@ public class DesignAndOrderTacosBrowserTest {
     fillField("input#deliveryCity", "F");
     fillField("input#deliveryState", "C");
     fillField("input#deliveryZip", "8");
-    fillField("input#ccNumber", "1234432112344322");
-    fillField("input#ccExpiration", "14/91");
-    fillField("input#ccCVV", "1234");
+    fillField("input#paymentMethodId", "PAYMENT-ID");
     browser.findElementByCssSelector("form#orderForm").submit();
 
     assertThat(browser.getCurrentUrl()).isEqualTo(orderDetailsPageUrl());
 
     List<String> validationErrors = getValidationErrorTexts();
     assertThat(validationErrors)
-        .hasSize(4)
-        .contains(
-          "Please correct the problems below and resubmit.",
-          "Not a valid credit card number",
-          "Must be formatted MM/YY",
-          "Invalid CVV");
+        .hasSize(1)
+        .contains("Please correct the problems below and resubmit.");
   }
 
   private void fillField(String fieldName, String value) {

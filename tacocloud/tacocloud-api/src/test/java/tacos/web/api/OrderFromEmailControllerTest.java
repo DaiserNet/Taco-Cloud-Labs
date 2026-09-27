@@ -58,7 +58,8 @@ class OrderFromEmailControllerTest {
     emailOrderService = mock(EmailOrderService.class);
     userRepo = mock(UserRepository.class);
     OrderService orderService = new OrderService(
-        repo, emailOrderService, messaging, userRepo, mock(Validator.class));
+        repo, emailOrderService, messaging, userRepo, mock(Validator.class),
+        mock(tacos.payment.PaymentMethodService.class));
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 
