@@ -42,6 +42,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.pricing.OrderPricingService;
 
 class OrderFromEmailControllerTest {
 
@@ -49,6 +50,7 @@ class OrderFromEmailControllerTest {
   private OrderMessagingService messaging;
   private EmailOrderService emailOrderService;
   private UserRepository userRepo;
+  private OrderPricingService orderPricingService;
   private OrderApiController controller;
 
   @BeforeEach
@@ -57,9 +59,12 @@ class OrderFromEmailControllerTest {
     messaging = mock(OrderMessagingService.class);
     emailOrderService = mock(EmailOrderService.class);
     userRepo = mock(UserRepository.class);
+    orderPricingService = mock(OrderPricingService.class);
+    when(orderPricingService.price(any(TacoOrder.class)))
+        .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     OrderService orderService = new OrderService(
         repo, emailOrderService, messaging, userRepo, mock(Validator.class),
-        mock(tacos.payment.PaymentMethodService.class));
+        mock(tacos.payment.PaymentMethodService.class), orderPricingService);
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 

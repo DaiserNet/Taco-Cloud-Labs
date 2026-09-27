@@ -19,7 +19,7 @@ export class CartComponent implements OnInit {
     deliveryState: '',
     deliveryZip: '',
     paymentMethodId: '',
-    tacos: []
+    items: []
   };
 
   payment = {
@@ -43,10 +43,16 @@ export class CartComponent implements OnInit {
   }
 
   onSubmit() {
-    // this.model.tacos = this.cart.getItemsInCart();
-    this.cart.getItemsInCart().forEach(cartItem => {
-      this.model.tacos.push(cartItem.taco);
-    });
+    this.model.items = this.cart.getItemsInCart()
+        .filter(cartItem => Number(cartItem.quantity) > 0)
+        .map(cartItem => ({
+          taco: {
+            name: cartItem.taco.name,
+            ingredientIds: cartItem.taco.ingredients
+                .map(ingredient => ingredient.id)
+          },
+          quantity: Number(cartItem.quantity)
+        }));
 
     this.httpClient.post<any>(
         'http://localhost:8080/api/payment-methods/tokenize',

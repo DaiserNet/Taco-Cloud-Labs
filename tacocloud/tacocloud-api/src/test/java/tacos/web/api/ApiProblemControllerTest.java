@@ -44,6 +44,7 @@ import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.pricing.OrderPricingService;
 import tacos.security.RegistrationConflictException;
 import tacos.security.RegistrationController;
 import tacos.security.RegistrationForm;
@@ -69,7 +70,8 @@ class ApiProblemControllerTest {
     registrationService = mock(RegistrationService.class);
     OrderService orderService = new OrderService(orderRepo, emailOrderService,
         messaging, userRepo, mock(Validator.class),
-        mock(tacos.payment.PaymentMethodService.class));
+        mock(tacos.payment.PaymentMethodService.class),
+        mock(OrderPricingService.class));
     OrderApiController orderController = new OrderApiController(
         orderService, new OrderMapper());
     mvc = MockMvcBuilders.standaloneSetup(
@@ -93,7 +95,7 @@ class ApiProblemControllerTest {
         .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
         .andExpect(jsonPath("$.instance").value("/api/orders"))
         .andExpect(jsonPath("$.violations[*].field",
-            hasItems("deliveryName", "paymentMethodId", "tacos")));
+            hasItems("deliveryName", "paymentMethodId", "items")));
 
     verifyNoInteractions(orderRepo, messaging);
   }

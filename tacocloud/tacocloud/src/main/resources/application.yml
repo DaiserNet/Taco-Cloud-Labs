@@ -90,6 +90,9 @@ info:
 tacocloud:
   api:
     allowed-origins: ${TACOCLOUD_API_ALLOWED_ORIGINS:http://localhost:8080}
+  order-pricing:
+    currency: USD
+    max-quantity: 10
 
 ---
 spring:

@@ -1,5 +1,6 @@
 package tacos.api.dto;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -19,7 +20,18 @@ public class OrderResponse {
   private String deliveryZip;
   private String paymentBrand;
   private String paymentLast4;
-  private List<TacoItem> tacos;
+  private String currency;
+  private BigDecimal subtotal;
+  private BigDecimal total;
+  private List<OrderItem> items;
+
+  @Data
+  public static class OrderItem {
+    private TacoItem taco;
+    private int quantity;
+    private BigDecimal unitPriceAtPurchase;
+    private BigDecimal subtotal;
+  }
 
   @Data
   public static class TacoItem {

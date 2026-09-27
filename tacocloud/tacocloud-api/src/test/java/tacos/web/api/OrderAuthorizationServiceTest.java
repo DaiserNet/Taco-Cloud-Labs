@@ -31,6 +31,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
+import tacos.pricing.OrderPricingService;
 
 class OrderAuthorizationServiceTest {
 
@@ -39,6 +40,7 @@ class OrderAuthorizationServiceTest {
   private EmailOrderService emailOrderService;
   private OrderMessagingService messaging;
   private PaymentMethodService paymentMethodService;
+  private OrderPricingService orderPricingService;
   private OrderService service;
 
   @BeforeEach
@@ -48,8 +50,10 @@ class OrderAuthorizationServiceTest {
     emailOrderService = mock(EmailOrderService.class);
     messaging = mock(OrderMessagingService.class);
     paymentMethodService = mock(PaymentMethodService.class);
+    orderPricingService = mock(OrderPricingService.class);
     service = new OrderService(orderRepo, emailOrderService, messaging,
-        userRepo, mock(Validator.class), paymentMethodService);
+        userRepo, mock(Validator.class), paymentMethodService,
+        orderPricingService);
   }
 
   @Test
@@ -90,6 +94,7 @@ class OrderAuthorizationServiceTest {
     when(userRepo.findByUsername("alice")).thenReturn(Mono.just(authenticated));
     when(paymentMethodService.findOwned("PAYMENT-ID", user("alice")))
         .thenReturn(Mono.just(payment));
+    when(orderPricingService.price(requested)).thenReturn(Mono.just(requested));
     when(orderRepo.save(requested)).thenReturn(Mono.just(requested));
 
     StepVerifier.create(service.createOrder(requested, user("alice")))

@@ -27,6 +27,7 @@ import tacos.security.RegistrationConflictException;
 import tacos.web.api.EmailOrderConversionException;
 import tacos.catalog.IngredientCatalogValidationException;
 import tacos.catalog.IngredientVersionConflictException;
+import tacos.pricing.OrderPricingException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -132,6 +133,13 @@ public class ApiExceptionHandler {
     return problem(HttpStatus.CONFLICT, "Ingredient version conflict",
         error.getMessage(), "INGREDIENT_VERSION_CONFLICT",
         Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(OrderPricingException.class)
+  public ResponseEntity<ApiProblem> handleOrderPricing(
+      OrderPricingException error, HttpServletRequest request) {
+    return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid order pricing",
+        error.getMessage(), error.getCode(), Collections.emptyList(), request);
   }
 
   @ExceptionHandler(RegistrationConflictException.class)

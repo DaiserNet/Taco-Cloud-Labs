@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import tacos.Ingredient;
+import tacos.OrderLine;
 import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
@@ -23,8 +24,8 @@ public class OrderMapper {
     order.setDeliveryState(request.getDeliveryState());
     order.setDeliveryZip(request.getDeliveryZip());
     order.setPaymentMethodId(request.getPaymentMethodId());
-    order.setTacos(safe(request.getTacos()).stream()
-        .map(this::toEntityTaco)
+    order.setItems(safe(request.getItems()).stream()
+        .map(this::toEntityLine)
         .collect(Collectors.toList()));
     return order;
   }
@@ -42,23 +43,46 @@ public class OrderMapper {
     response.setDeliveryZip(order.getDeliveryZip());
     response.setPaymentBrand(order.getPaymentBrand());
     response.setPaymentLast4(order.getPaymentLast4());
-    response.setTacos(safe(order.getTacos()).stream()
-        .map(this::toResponseTaco)
+    response.setCurrency(order.getCurrency());
+    response.setSubtotal(order.getSubtotal());
+    response.setTotal(order.getTotal());
+    response.setItems(responseLines(order).stream()
+        .map(this::toResponseLine)
         .collect(Collectors.toList()));
     return response;
+  }
+
+  private OrderLine toEntityLine(OrderCreateRequest.OrderItem request) {
+    OrderLine line = new OrderLine();
+    if (request != null) {
+      line.setTaco(toEntityTaco(request.getTaco()));
+      line.setQuantity(request.getQuantity() == null ? 0 : request.getQuantity());
+    }
+    return line;
   }
 
   private Taco toEntityTaco(OrderCreateRequest.TacoItem request) {
     Taco taco = new Taco();
     if (request != null) {
-      taco.setId(request.getId());
       taco.setName(request.getName());
-      taco.setIngredients(safe(request.getIngredients()).stream()
-          .map(ingredient -> new Ingredient(
-              ingredient == null ? null : ingredient.getId(), null, null))
+      taco.setIngredients(safe(request.getIngredientIds()).stream()
+          .map(id -> new Ingredient(id, null, null))
           .collect(Collectors.toList()));
     }
     return taco;
+  }
+
+  private OrderResponse.OrderItem toResponseLine(OrderLine line) {
+    OrderResponse.OrderItem response = new OrderResponse.OrderItem();
+    if (line == null) {
+      response.setTaco(toResponseTaco(null));
+      return response;
+    }
+    response.setTaco(toResponseTaco(line.getTaco()));
+    response.setQuantity(line.getQuantity());
+    response.setUnitPriceAtPurchase(line.getUnitPriceAtPurchase());
+    response.setSubtotal(line.getSubtotal());
+    return response;
   }
 
   private OrderResponse.TacoItem toResponseTaco(Taco taco) {
@@ -73,6 +97,20 @@ public class OrderMapper {
         .map(ingredient -> ingredient == null ? null : ingredient.getId())
         .collect(Collectors.toList()));
     return response;
+  }
+
+  private List<OrderLine> responseLines(TacoOrder order) {
+    if (order.getItems() != null && !order.getItems().isEmpty()) {
+      return order.getItems();
+    }
+    return safe(order.getTacos()).stream()
+        .map(taco -> {
+          OrderLine line = new OrderLine();
+          line.setTaco(taco);
+          line.setQuantity(1);
+          return line;
+        })
+        .collect(Collectors.toList());
   }
 
   private <T> List<T> safe(List<T> values) {

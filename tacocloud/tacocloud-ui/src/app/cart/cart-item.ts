@@ -8,8 +8,16 @@ export class CartItem {
     this.taco = taco;
   }
 
+  get unitPrice() {
+    const ingredients = this.taco && this.taco.ingredients
+        ? this.taco.ingredients : [];
+    const total = ingredients.reduce(
+        (sum, ingredient) => sum + Number(ingredient.unitPrice || 0), 0);
+    return Math.round(total * 100) / 100;
+  }
+
   get lineTotal() {
-    return this.quantity * 4.99;
+    return Math.round(this.quantity * this.unitPrice * 100) / 100;
   }
 
 }

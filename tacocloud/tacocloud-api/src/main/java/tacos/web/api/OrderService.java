@@ -20,6 +20,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
+import tacos.pricing.OrderPricingService;
 
 @Service
 public class OrderService {
@@ -30,16 +31,19 @@ public class OrderService {
   private final UserRepository userRepo;
   private final Validator validator;
   private final PaymentMethodService paymentMethodService;
+  private final OrderPricingService orderPricingService;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
       OrderMessagingService orderMessages, UserRepository userRepo,
-      Validator validator, PaymentMethodService paymentMethodService) {
+      Validator validator, PaymentMethodService paymentMethodService,
+      OrderPricingService orderPricingService) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
     this.orderMessages = orderMessages;
     this.userRepo = userRepo;
     this.validator = validator;
     this.paymentMethodService = paymentMethodService;
+    this.orderPricingService = orderPricingService;
   }
 
   public Flux<TacoOrder> findVisibleOrders(Authentication authentication) {
@@ -62,13 +66,15 @@ public class OrderService {
     return currentUser(authentication)
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
-            .flatMap(payment -> {
-              order.setUser(user);
-              order.setPaymentBrand(payment.getBrand());
-              order.setPaymentLast4(payment.getLast4());
-              return Mono.fromRunnable(() -> orderMessages.sendOrder(order))
-                  .then(Mono.defer(() -> repo.save(order)));
-            }));
+            .flatMap(payment -> orderPricingService.price(order)
+                .flatMap(pricedOrder -> {
+                  pricedOrder.setUser(user);
+                  pricedOrder.setPaymentBrand(payment.getBrand());
+                  pricedOrder.setPaymentLast4(payment.getLast4());
+                  return Mono.fromRunnable(
+                      () -> orderMessages.sendOrder(pricedOrder))
+                      .then(Mono.defer(() -> repo.save(pricedOrder)));
+                })));
   }
 
   public Mono<TacoOrder> createFromEmail(
@@ -86,6 +92,7 @@ public class OrderService {
         .flatMap(order -> isOwnerOrAdmin(order, authentication)
             ? Mono.just(order)
             : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)))
+        .flatMap(orderPricingService::price)
         .flatMap(repo::save)
         .flatMap(savedOrder -> Mono.fromRunnable(
             () -> orderMessages.sendOrder(savedOrder))

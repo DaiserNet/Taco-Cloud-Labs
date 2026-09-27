@@ -3,13 +3,13 @@ package tacos.api.dto;
 import java.util.List;
 
 import javax.validation.Valid;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import lombok.Data;
 
@@ -41,9 +41,9 @@ public class OrderCreateRequest {
   private String paymentMethodId;
 
   @NotNull(message = "must be provided")
-  @Size(min = 1, max = 50, message = "must contain between 1 and 50 tacos")
+  @Size(min = 1, max = 50, message = "must contain between 1 and 50 items")
   @Valid
-  private List<TacoItem> tacos;
+  private List<OrderItem> items;
 
   @JsonAnySetter
   public void rejectUnknownField(String name, Object value) {
@@ -51,27 +51,37 @@ public class OrderCreateRequest {
   }
 
   @Data
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class TacoItem {
-    @Size(max = 64, message = "must contain at most 64 characters")
-    private String id;
+  public static class OrderItem {
+    @NotNull(message = "must be provided")
+    @Valid
+    private TacoItem taco;
 
+    @NotNull(message = "must be provided")
+    @Min(value = 1, message = "must be at least 1")
+    private Integer quantity;
+
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+      throw new IllegalArgumentException("Field not allowed in order item: " + name);
+    }
+  }
+
+  @Data
+  public static class TacoItem {
     @NotBlank(message = "must not be blank")
     @Size(min = 5, max = 100, message = "must contain between 5 and 100 characters")
     private String name;
 
     @NotNull(message = "must be provided")
     @Size(min = 1, max = 20, message = "must contain between 1 and 20 ingredients")
-    @Valid
-    private List<IngredientItem> ingredients;
-  }
+    private List<@NotBlank(message = "must not be blank")
+        @Size(max = 64, message = "must contain at most 64 characters")
+        @Pattern(regexp = "[A-Za-z0-9_-]+",
+            message = "must be an alphanumeric identifier") String> ingredientIds;
 
-  @Data
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class IngredientItem {
-    @NotBlank(message = "must not be blank")
-    @Size(max = 64, message = "must contain at most 64 characters")
-    @Pattern(regexp = "[A-Za-z0-9_-]+", message = "must be an alphanumeric identifier")
-    private String id;
+    @JsonAnySetter
+    public void rejectUnknownField(String name, Object value) {
+      throw new IllegalArgumentException("Field not allowed in taco item: " + name);
+    }
   }
 }

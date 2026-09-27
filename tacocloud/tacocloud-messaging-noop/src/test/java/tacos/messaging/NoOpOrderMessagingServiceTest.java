@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import tacos.OrderLine;
 import tacos.Taco;
 import tacos.TacoOrder;
 
@@ -27,13 +28,16 @@ class NoOpOrderMessagingServiceTest {
       order.setPaymentMethodId("PAYMENT-ID");
       order.setPaymentBrand("VISA");
       order.setPaymentLast4("0002");
-      order.addTaco(new Taco());
+      OrderLine line = new OrderLine();
+      line.setTaco(new Taco());
+      line.setQuantity(3);
+      order.addItem(line);
 
       new NoOpOrderMessagingService().sendOrder(order);
 
       String message = appender.list.get(0).getFormattedMessage();
       assertTrue(message.contains("ORDER-ID"));
-      assertTrue(message.contains("tacoCount=1"));
+      assertTrue(message.contains("tacoCount=3"));
       assertFalse(message.contains("PAYMENT-ID"));
       assertFalse(message.contains("VISA"));
       assertFalse(message.contains("0002"));

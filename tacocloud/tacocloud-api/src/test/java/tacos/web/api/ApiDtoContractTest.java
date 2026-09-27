@@ -95,14 +95,13 @@ class ApiDtoContractTest {
     request.setDeliveryState("ST");
     request.setDeliveryZip("00000");
     request.setPaymentMethodId("PAYMENT-ID");
-    OrderCreateRequest.IngredientItem ingredient =
-        new OrderCreateRequest.IngredientItem();
-    ingredient.setId("WRAP");
     OrderCreateRequest.TacoItem taco = new OrderCreateRequest.TacoItem();
-    taco.setId("TACO-ID");
     taco.setName("Reference taco");
-    taco.setIngredients(Arrays.asList(ingredient));
-    request.setTacos(Arrays.asList(taco));
+    taco.setIngredientIds(Arrays.asList("WRAP"));
+    OrderCreateRequest.OrderItem item = new OrderCreateRequest.OrderItem();
+    item.setTaco(taco);
+    item.setQuantity(2);
+    request.setItems(Arrays.asList(item));
 
     TacoOrder order = new OrderMapper().toEntity(request);
 
@@ -112,9 +111,11 @@ class ApiDtoContractTest {
     assertEquals(OrderStatus.PLACED, order.getStatus());
     assertEquals("Delivery Name", order.getDeliveryName());
     assertEquals("PAYMENT-ID", order.getPaymentMethodId());
-    assertEquals("TACO-ID", order.getTacos().get(0).getId());
-    assertEquals("WRAP", order.getTacos().get(0).getIngredients().get(0).getId());
-    assertNull(order.getTacos().get(0).getIngredients().get(0).getName());
+    assertEquals(2, order.getItems().get(0).getQuantity());
+    assertEquals("Reference taco", order.getItems().get(0).getTaco().getName());
+    assertEquals("WRAP",
+        order.getItems().get(0).getTaco().getIngredients().get(0).getId());
+    assertNull(order.getItems().get(0).getTaco().getIngredients().get(0).getName());
   }
 
   @Test
@@ -138,7 +139,7 @@ class ApiDtoContractTest {
     assertEquals(new LinkedHashSet<>(Arrays.asList(
         "id", "placedAt", "status", "userId", "deliveryName", "deliveryStreet",
         "deliveryCity", "deliveryState", "deliveryZip", "paymentBrand",
-        "paymentLast4", "tacos")),
+        "paymentLast4", "currency", "subtotal", "total", "items")),
         actualFields);
     assertEquals("USER-ID", json.get("userId").asText());
     assertEquals("1111", json.get("paymentLast4").asText());
