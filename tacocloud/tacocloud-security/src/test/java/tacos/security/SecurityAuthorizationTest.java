@@ -3,6 +3,7 @@ package tacos.security;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -66,13 +68,30 @@ class SecurityAuthorizationTest {
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
     mvc.perform(post("/api/kitchen/queue").with(csrf())).andExpect(status().isForbidden());
+    mvc.perform(patch("/api/admin/ingredients/FLTO/catalog").with(csrf()))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments").with(csrf()))
+        .andExpect(status().isForbidden());
   }
 
   @Test
   @WithMockUser(roles = "ADMIN")
   void shouldAllowAdminIngredientManagementAndOrderAudit() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isOk());
+    mvc.perform(patch("/api/admin/ingredients/FLTO/catalog").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments").with(csrf()))
+        .andExpect(status().isOk());
     mvc.perform(get("/api/orders")).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void shouldRequireCsrfForAdminCatalogWrites() throws Exception {
+    mvc.perform(patch("/api/admin/ingredients/FLTO/catalog"))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments"))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -111,8 +130,14 @@ class SecurityAuthorizationTest {
     }
 
     @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
-        "/api/payment-methods/tokenize"})
+        "/api/payment-methods/tokenize",
+        "/api/admin/ingredients/FLTO/stock-adjustments"})
     String write() {
+      return "ok";
+    }
+
+    @PatchMapping("/api/admin/ingredients/FLTO/catalog")
+    String patchCatalog() {
       return "ok";
     }
   }

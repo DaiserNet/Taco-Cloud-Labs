@@ -1,5 +1,7 @@
 package tacos.web.api;
 
+import java.math.BigDecimal;
+
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -101,7 +103,8 @@ public class IngredientControllerTest {
         StepVerifier.create(responseMono)
             .expectNextMatches(response -> response.getStatusCode().is2xxSuccessful()
                 && response.getBody().equals(new IngredientResponse(
-                    "FLTO", "Flour Tortilla", Ingredient.Type.WRAP)))
+                    "FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+                    new BigDecimal("0.00"), false)))
             .verifyComplete();
 
         saveProbe.assertWasSubscribed();

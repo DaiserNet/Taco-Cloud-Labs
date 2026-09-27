@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashSet;
@@ -159,6 +160,7 @@ class ApiDtoContractTest {
     IngredientResponse response = mapper.toResponse(entity);
 
     assertEquals(new Ingredient("TEST", "Test ingredient", Type.SAUCE), entity);
-    assertEquals(new IngredientResponse("TEST", "Test ingredient", Type.SAUCE), response);
+    assertEquals(new IngredientResponse("TEST", "Test ingredient", Type.SAUCE,
+        new BigDecimal("0.00"), false), response);
   }
 }

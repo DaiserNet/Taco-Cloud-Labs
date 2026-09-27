@@ -25,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import tacos.security.RegistrationConflictException;
 import tacos.web.api.EmailOrderConversionException;
+import tacos.catalog.IngredientCatalogValidationException;
+import tacos.catalog.IngredientVersionConflictException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -115,6 +117,21 @@ public class ApiExceptionHandler {
       EmailOrderConversionException error, HttpServletRequest request) {
     return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Business rule violation",
         error.getMessage(), error.getCode(), Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(IngredientCatalogValidationException.class)
+  public ResponseEntity<ApiProblem> handleIngredientCatalogValidation(
+      IngredientCatalogValidationException error, HttpServletRequest request) {
+    return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid ingredient catalog",
+        error.getMessage(), error.getCode(), Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(IngredientVersionConflictException.class)
+  public ResponseEntity<ApiProblem> handleIngredientVersionConflict(
+      IngredientVersionConflictException error, HttpServletRequest request) {
+    return problem(HttpStatus.CONFLICT, "Ingredient version conflict",
+        error.getMessage(), "INGREDIENT_VERSION_CONFLICT",
+        Collections.emptyList(), request);
   }
 
   @ExceptionHandler(RegistrationConflictException.class)
