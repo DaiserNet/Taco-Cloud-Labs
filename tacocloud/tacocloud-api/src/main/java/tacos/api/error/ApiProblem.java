@@ -2,6 +2,8 @@ package tacos.api.error;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -22,5 +24,12 @@ public class ApiProblem {
   public static class Violation {
     private String field;
     private String message;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String code;
+
+    public Violation(String field, String message) {
+      this(field, message, null);
+    }
   }
 }

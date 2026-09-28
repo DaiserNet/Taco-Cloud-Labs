@@ -44,6 +44,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
+import tacos.design.TacoDesignTestSupport;
 import tacos.messaging.OrderMessagingService;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
@@ -58,6 +59,7 @@ class OrderPricingControllerTest {
   private UserRepository userRepo;
   private PaymentMethodService paymentMethodService;
   private OrderMessagingService messaging;
+  private InventoryService inventoryService;
   private MockMvc mvc;
 
   @BeforeEach
@@ -68,11 +70,12 @@ class OrderPricingControllerTest {
     paymentMethodService = mock(PaymentMethodService.class);
     messaging = mock(OrderMessagingService.class);
     OrderPricingService pricingService =
-        new OrderPricingService(ingredientRepo, 10, "USD");
+        new OrderPricingService(TacoDesignTestSupport.validator(ingredientRepo),
+            10, "USD");
     CouponService couponService = mock(CouponService.class);
     when(couponService.apply(any(TacoOrder.class)))
         .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-    InventoryService inventoryService = mock(InventoryService.class);
+    inventoryService = mock(InventoryService.class);
     InventoryReservation reservation = mock(InventoryReservation.class);
     when(reservation.getId()).thenReturn("RESERVATION-ID");
     when(inventoryService.reserve(any(TacoOrder.class)))
@@ -158,6 +161,23 @@ class OrderPricingControllerTest {
     verify(orderRepo, never()).save(any(TacoOrder.class));
   }
 
+  @Test
+  void shouldRejectInvalidDesignBeforeInventoryReservation() throws Exception {
+    prepareOwnerAndPayment();
+    when(ingredientRepo.findById("WRAP"))
+        .thenReturn(Mono.just(ingredient("WRAP", "1.10")));
+
+    perform(post("/api/orders").content(
+        validOrder(1).replace("\"SLSA\"", "\"WRAP\"")), user())
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("TACO_DESIGN_INVALID"))
+        .andExpect(jsonPath("$.violations[0].code").value("TACO_BASE_COUNT"));
+
+    verify(inventoryService, never()).reserve(any(TacoOrder.class));
+    verify(orderRepo, never()).save(any(TacoOrder.class));
+    verify(messaging, never()).sendOrder(any(TacoOrder.class));
+  }
+
   private ResultActions perform(
       MockHttpServletRequestBuilder request, Principal principal) throws Exception {
     MvcResult pending = mvc.perform(request.principal(principal)
@@ -186,7 +206,8 @@ class OrderPricingControllerTest {
   }
 
   private Ingredient ingredient(String id, String price) {
-    return new Ingredient(id, id + " ingredient", Ingredient.Type.WRAP,
+    return new Ingredient(id, id + " ingredient",
+        "WRAP".equals(id) ? Ingredient.Type.WRAP : Ingredient.Type.SAUCE,
         new BigDecimal(price), true, 20, 5);
   }
 

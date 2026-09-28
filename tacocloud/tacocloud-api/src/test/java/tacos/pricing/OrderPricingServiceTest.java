@@ -19,6 +19,8 @@ import tacos.OrderLine;
 import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.data.IngredientRepository;
+import tacos.design.TacoDesignException;
+import tacos.design.TacoDesignTestSupport;
 
 class OrderPricingServiceTest {
 
@@ -28,7 +30,8 @@ class OrderPricingServiceTest {
   @BeforeEach
   void setUp() {
     ingredientRepo = mock(IngredientRepository.class);
-    service = new OrderPricingService(ingredientRepo, 10, "USD");
+    service = new OrderPricingService(
+        TacoDesignTestSupport.validator(ingredientRepo), 10, "USD");
   }
 
   @Test
@@ -55,8 +58,10 @@ class OrderPricingServiceTest {
   @Test
   void shouldKeepPriceSnapshotWhenCatalogPriceChanges() {
     Ingredient wrap = ingredient("WRAP", "1.10");
+    Ingredient salsa = ingredient("SLSA", "0.00");
     when(ingredientRepo.findById("WRAP")).thenReturn(Mono.just(wrap));
-    TacoOrder order = order(3, "WRAP");
+    when(ingredientRepo.findById("SLSA")).thenReturn(Mono.just(salsa));
+    TacoOrder order = order(3, "WRAP", "SLSA");
 
     StepVerifier.create(service.price(order))
         .assertNext(priced -> {
@@ -86,10 +91,11 @@ class OrderPricingServiceTest {
     when(ingredientRepo.findById("UNKNOWN")).thenReturn(Mono.empty());
 
     StepVerifier.create(service.price(order(1, "UNKNOWN")))
-        .expectErrorMatches(error -> error instanceof OrderPricingException
-            && "ORDER_INGREDIENT_NOT_FOUND".equals(
-                ((OrderPricingException) error).getCode())
-            && error.getMessage().contains("UNKNOWN"))
+        .expectErrorMatches(error -> error instanceof TacoDesignException
+            && ((TacoDesignException) error).getValidation().getViolations()
+                .stream().anyMatch(violation ->
+                    "TACO_INGREDIENT_UNKNOWN".equals(violation.getCode())
+                        && violation.getMessage().contains("UNKNOWN")))
         .verify();
   }
 
@@ -100,9 +106,10 @@ class OrderPricingServiceTest {
     when(ingredientRepo.findById("WRAP")).thenReturn(Mono.just(unavailable));
 
     StepVerifier.create(service.price(order(1, "WRAP")))
-        .expectErrorMatches(error -> error instanceof OrderPricingException
-            && "ORDER_INGREDIENT_UNAVAILABLE".equals(
-                ((OrderPricingException) error).getCode()))
+        .expectErrorMatches(error -> error instanceof TacoDesignException
+            && ((TacoDesignException) error).getValidation().getViolations()
+                .stream().anyMatch(violation ->
+                    "TACO_INGREDIENT_UNAVAILABLE".equals(violation.getCode())))
         .verify();
   }
 
@@ -121,7 +128,8 @@ class OrderPricingServiceTest {
   }
 
   private Ingredient ingredient(String id, String price) {
-    return new Ingredient(id, id + " ingredient", Ingredient.Type.WRAP,
+    return new Ingredient(id, id + " ingredient",
+        "WRAP".equals(id) ? Ingredient.Type.WRAP : Ingredient.Type.SAUCE,
         new BigDecimal(price), true, 20, 5);
   }
 }

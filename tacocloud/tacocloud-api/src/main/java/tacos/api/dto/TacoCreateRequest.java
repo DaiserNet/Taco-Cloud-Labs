@@ -20,7 +20,7 @@ public class TacoCreateRequest {
   private String name;
 
   @NotNull
-  @Size(min = 1, max = 20)
+  @Size(max = 50)
   private List<@NotNull @Valid IngredientId> ingredients;
 
   @JsonAnySetter

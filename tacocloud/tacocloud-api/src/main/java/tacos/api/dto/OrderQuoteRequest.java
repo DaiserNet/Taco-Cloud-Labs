@@ -2,6 +2,7 @@ package tacos.api.dto;
 
 import java.math.BigDecimal;
 
+import javax.validation.Valid;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.NotBlank;
@@ -33,6 +34,9 @@ public class OrderQuoteRequest {
   @Pattern(regexp = "[A-Za-z0-9_-]+",
       message = "must be an alphanumeric identifier")
   private String tacoId;
+
+  @Valid
+  private TacoCreateRequest taco;
 
   @JsonAnySetter
   public void rejectUnknownField(String name, Object value) {

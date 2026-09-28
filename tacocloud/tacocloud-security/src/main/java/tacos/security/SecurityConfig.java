@@ -42,6 +42,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/Cloud_sm.*.png").permitAll()
         .antMatchers("/api/admin/**").hasRole("ADMIN")
         .antMatchers(HttpMethod.GET, "/api/tacos/**", "/api/ingredients/**").permitAll()
+        .antMatchers(HttpMethod.POST, "/api/tacos/validate")
+            .hasAnyRole("USER", "ADMIN")
         .antMatchers("/api/ingredients/**", "/api/tacos/**").hasRole("ADMIN")
         .antMatchers("/api/kitchen/**").hasRole("KITCHEN")
         .antMatchers("/api/payment-methods/**").hasRole("USER")

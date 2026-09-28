@@ -38,6 +38,10 @@ public class DevelopmentConfig {
             "COTO", "Corn Tortilla", Type.WRAP, "0.45", 100, 20,
             tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
                 DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
+        Ingredient riceBowl = saveAnIngredient(
+            "BOWL", "Rice Bowl", Type.BOWL, "0.70", 100, 20,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
+                DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient groundBeef = saveAnIngredient(
             "GRBF", "Ground Beef", Type.PROTEIN, "1.25", 80, 15,
             tags(DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
@@ -117,7 +121,7 @@ public class DevelopmentConfig {
         Taco taco3 = new Taco();
         taco3.setId("TACO3");
         taco3.setName("Veg-Out");
-        taco3.setIngredients(Arrays.asList(flourTortilla, cornTortilla, tomatoes, lettuce, salsa));
+        taco3.setIngredients(Arrays.asList(riceBowl, tomatoes, lettuce, salsa));
         tacoRepo.save(taco3).subscribe();
 
       }

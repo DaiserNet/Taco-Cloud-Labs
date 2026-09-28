@@ -30,9 +30,23 @@ import tacos.catalog.IngredientVersionConflictException;
 import tacos.inventory.InventoryReservationException;
 import tacos.pricing.OrderPricingException;
 import tacos.pricing.CouponValidationException;
+import tacos.design.TacoDesignException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+  @ExceptionHandler(TacoDesignException.class)
+  public ResponseEntity<ApiProblem> handleTacoDesign(
+      TacoDesignException error, HttpServletRequest request) {
+    List<ApiProblem.Violation> violations = error.getValidation()
+        .getViolations().stream()
+        .map(violation -> new ApiProblem.Violation(
+            "ingredients", violation.getMessage(), violation.getCode()))
+        .collect(Collectors.toList());
+    return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid taco design",
+        "Taco design violates one or more rules.",
+        "TACO_DESIGN_INVALID", violations, request);
+  }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiProblem> handleValidation(

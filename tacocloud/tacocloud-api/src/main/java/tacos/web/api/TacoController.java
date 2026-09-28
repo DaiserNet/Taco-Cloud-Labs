@@ -16,13 +16,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import tacos.Ingredient;
 import tacos.Taco;
 import tacos.api.dto.TacoClassification;
 import tacos.api.dto.TacoCreateRequest;
+import tacos.api.dto.TacoDesignValidationResponse;
 import tacos.api.dto.TacoResponse;
 import tacos.api.mapper.IngredientMapper;
 import tacos.classification.TacoClassificationService;
+import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
 
 @RestController
@@ -31,13 +32,15 @@ public class TacoController {
   private final TacoRepository tacoRepo;
   private final TacoClassificationService classificationService;
   private final IngredientMapper ingredientMapper;
+  private final TacoDesignValidator designValidator;
 
   public TacoController(TacoRepository tacoRepo,
       TacoClassificationService classificationService,
-      IngredientMapper ingredientMapper) {
+      IngredientMapper ingredientMapper, TacoDesignValidator designValidator) {
     this.tacoRepo = tacoRepo;
     this.classificationService = classificationService;
     this.ingredientMapper = ingredientMapper;
+    this.designValidator = designValidator;
   }
 
   @GetMapping(params="recent")
@@ -51,14 +54,15 @@ public class TacoController {
   @ResponseStatus(HttpStatus.CREATED)
   public Mono<TacoResponse> postTaco(
       @Valid @RequestBody TacoCreateRequest request) {
-    Taco taco = new Taco();
-    taco.setName(request.getName());
-    taco.setIngredients(request.getIngredients().stream()
-        .map(ingredient -> new Ingredient(ingredient.getId(), null, null))
-        .collect(Collectors.toList()));
-    return classificationService.resolveIngredients(taco)
+    return designValidator.requireValid(request)
         .flatMap(tacoRepo::save)
         .map(this::toResponse);
+  }
+
+  @PostMapping(path = "/validate", consumes = "application/json")
+  public Mono<TacoDesignValidationResponse> validateTaco(
+      @Valid @RequestBody TacoCreateRequest request) {
+    return designValidator.validate(request);
   }
 
   @GetMapping("/{id}")

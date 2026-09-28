@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -39,6 +40,7 @@ import tacos.api.error.ApiExceptionHandler;
 import tacos.classification.TacoClassificationService;
 import tacos.data.IngredientRepository;
 import tacos.data.TacoRepository;
+import tacos.design.TacoDesignTestSupport;
 import tacos.pricing.CouponProperties;
 import tacos.pricing.CouponProperties.CouponRule;
 import tacos.pricing.CouponService;
@@ -60,7 +62,8 @@ class CouponControllerTest {
     tacoRepo = mock(TacoRepository.class);
     ingredientRepo = mock(IngredientRepository.class);
     mvc = MockMvcBuilders.standaloneSetup(new CouponController(service,
-            tacoRepo, new TacoClassificationService(ingredientRepo)))
+            tacoRepo, new TacoClassificationService(ingredientRepo),
+            TacoDesignTestSupport.validator(ingredientRepo)))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }
@@ -96,14 +99,23 @@ class CouponControllerTest {
     Taco taco = new Taco();
     taco.setId("TACO-QUOTE");
     taco.setName("Quote taco");
-    taco.setIngredients(Collections.singletonList(
-        new Ingredient("SLSA", null, null)));
+    taco.setIngredients(java.util.Arrays.asList(
+        new Ingredient("WRAP", null, null), new Ingredient("SLSA", null, null)));
+    Ingredient wrap = new Ingredient("WRAP", "Wrap", Ingredient.Type.WRAP);
+    wrap.setAvailable(true);
+    wrap.setStockOnHand(10);
+    wrap.setDietaryTags(EnumSet.of(DietaryTag.VEGAN,
+        DietaryTag.GLUTEN_FREE));
+    wrap.setSpiceLevel(SpiceLevel.NONE);
     Ingredient salsa = new Ingredient("SLSA", "Salsa", Ingredient.Type.SAUCE);
+    salsa.setAvailable(true);
+    salsa.setStockOnHand(10);
     salsa.setDietaryTags(EnumSet.of(DietaryTag.VEGAN,
         DietaryTag.GLUTEN_FREE));
     salsa.setAllergens(EnumSet.of(Allergen.SESAME));
     salsa.setSpiceLevel(SpiceLevel.HOT);
     when(tacoRepo.findById("TACO-QUOTE")).thenReturn(Mono.just(taco));
+    when(ingredientRepo.findById("WRAP")).thenReturn(Mono.just(wrap));
     when(ingredientRepo.findById("SLSA")).thenReturn(Mono.just(salsa));
 
     perform(post("/api/orders/quote")
@@ -124,6 +136,28 @@ class CouponControllerTest {
             .content("{\"subtotal\":100.00,\"couponCode\":\"save50\","
                 + "\"classification\":{\"dietaryTags\":[\"VEGAN\"]}}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void shouldValidateInlineDesignBeforeCalculatingQuote() throws Exception {
+    CouponService guardedCoupon = mock(CouponService.class);
+    Ingredient wrap = new Ingredient("WRAP", "Wrap", Ingredient.Type.WRAP);
+    wrap.setAvailable(true);
+    wrap.setStockOnHand(10);
+    when(ingredientRepo.findById("WRAP")).thenReturn(Mono.just(wrap));
+    mvc = MockMvcBuilders.standaloneSetup(new CouponController(guardedCoupon,
+            tacoRepo, new TacoClassificationService(ingredientRepo),
+            TacoDesignTestSupport.validator(ingredientRepo)))
+        .setControllerAdvice(new ApiExceptionHandler()).build();
+
+    perform(post("/api/orders/quote")
+        .content("{\"subtotal\":100.00,\"couponCode\":\"save50\","
+            + "\"taco\":{\"name\":\"Wrong taco\",\"ingredients\":["
+            + "{\"id\":\"WRAP\"},{\"id\":\"WRAP\"}]}}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("TACO_DESIGN_INVALID"))
+        .andExpect(jsonPath("$.violations[0].code").value("TACO_BASE_COUNT"));
+    verifyNoInteractions(guardedCoupon);
   }
 
   @Test

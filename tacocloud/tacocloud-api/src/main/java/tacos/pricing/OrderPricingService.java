@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -17,24 +16,24 @@ import tacos.Ingredient;
 import tacos.OrderLine;
 import tacos.Taco;
 import tacos.TacoOrder;
-import tacos.data.IngredientRepository;
+import tacos.design.TacoDesignValidator;
 
 @Service
 public class OrderPricingService {
 
   private static final int MONEY_SCALE = 2;
 
-  private final IngredientRepository ingredientRepo;
+  private final TacoDesignValidator designValidator;
   private final int maxQuantity;
   private final String currency;
 
-  public OrderPricingService(IngredientRepository ingredientRepo,
+  public OrderPricingService(TacoDesignValidator designValidator,
       @Value("${tacocloud.order-pricing.max-quantity:10}") int maxQuantity,
       @Value("${tacocloud.order-pricing.currency:USD}") String currency) {
     if (maxQuantity < 1) {
       throw new IllegalArgumentException("Maximum order quantity must be positive.");
     }
-    this.ingredientRepo = ingredientRepo;
+    this.designValidator = designValidator;
     this.maxQuantity = maxQuantity;
     this.currency = Currency.getInstance(currency).getCurrencyCode();
   }
@@ -74,17 +73,16 @@ public class OrderPricingService {
     }
 
     Taco taco = line.getTaco();
-    List<Ingredient> ingredientReferences = safe(taco.getIngredients());
-    if (ingredientReferences.isEmpty()) {
-      return Mono.error(new OrderPricingException(
-          "ORDER_INGREDIENTS_REQUIRED",
-          "Each taco must contain at least one ingredient."));
-    }
-
-    return Flux.fromIterable(ingredientReferences)
-        .concatMap(this::resolveSellableIngredient)
-        .collectList()
-        .map(ingredients -> {
+    return designValidator.requireValid(taco)
+        .map(validTaco -> {
+          List<Ingredient> ingredients = validTaco.getIngredients();
+          for (Ingredient ingredient : ingredients) {
+            if (ingredient.getUnitPrice() == null
+                || ingredient.getUnitPrice().signum() < 0) {
+              throw new OrderPricingException("ORDER_INGREDIENT_PRICE_INVALID",
+                  "Ingredient has no valid price: " + ingredient.getId());
+            }
+          }
           BigDecimal unitPrice = ingredients.stream()
               .map(Ingredient::getUnitPrice)
               .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -92,36 +90,9 @@ public class OrderPricingService {
           BigDecimal lineSubtotal = unitPrice
               .multiply(BigDecimal.valueOf(line.getQuantity()))
               .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-          taco.setIngredients(ingredients);
           line.setUnitPriceAtPurchase(unitPrice);
           line.setSubtotal(lineSubtotal);
           return line;
-        });
-  }
-
-  private Mono<Ingredient> resolveSellableIngredient(Ingredient reference) {
-    String ingredientId = reference == null ? null : reference.getId();
-    if (!StringUtils.hasText(ingredientId)) {
-      return Mono.error(new OrderPricingException(
-          "ORDER_INGREDIENT_ID_REQUIRED", "Ingredient ID must be provided."));
-    }
-    return ingredientRepo.findById(ingredientId)
-        .switchIfEmpty(Mono.error(new OrderPricingException(
-            "ORDER_INGREDIENT_NOT_FOUND",
-            "Unknown ingredient: " + ingredientId)))
-        .flatMap(ingredient -> {
-          if (!ingredient.isAvailable() || ingredient.getStockOnHand() < 1) {
-            return Mono.error(new OrderPricingException(
-                "ORDER_INGREDIENT_UNAVAILABLE",
-                "Ingredient is not available: " + ingredientId));
-          }
-          if (ingredient.getUnitPrice() == null
-              || ingredient.getUnitPrice().signum() < 0) {
-            return Mono.error(new OrderPricingException(
-                "ORDER_INGREDIENT_PRICE_INVALID",
-                "Ingredient has no valid price: " + ingredientId));
-          }
-          return Mono.just(ingredient);
         });
   }
 

@@ -45,6 +45,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
+import tacos.design.TacoDesignTestSupport;
 import tacos.messaging.OrderMessagingService;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
@@ -78,7 +79,8 @@ class OrderCouponControllerTest {
         Clock.fixed(Instant.parse("2026-09-27T12:00:00Z"), ZoneOffset.UTC),
         "USD");
     OrderPricingService pricingService =
-        new OrderPricingService(ingredientRepo, 10, "USD");
+        new OrderPricingService(TacoDesignTestSupport.validator(ingredientRepo),
+            10, "USD");
     InventoryService inventoryService = mock(InventoryService.class);
     InventoryReservation reservation = mock(InventoryReservation.class);
     when(reservation.getId()).thenReturn("RESERVATION-ID");
@@ -159,7 +161,8 @@ class OrderCouponControllerTest {
   }
 
   private Ingredient ingredient(String id, String price) {
-    return new Ingredient(id, id + " ingredient", Ingredient.Type.WRAP,
+    return new Ingredient(id, id + " ingredient",
+        "WRAP".equals(id) ? Ingredient.Type.WRAP : Ingredient.Type.SAUCE,
         new BigDecimal(price), true, 20, 5);
   }
 

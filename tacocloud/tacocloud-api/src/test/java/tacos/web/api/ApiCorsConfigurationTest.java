@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import tacos.api.mapper.IngredientMapper;
 import tacos.classification.TacoClassificationService;
+import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
 
 @WebMvcTest(TacoController.class)
@@ -34,6 +35,9 @@ class ApiCorsConfigurationTest {
 
   @MockBean
   private TacoClassificationService classificationService;
+
+  @MockBean
+  private TacoDesignValidator designValidator;
 
   @MockBean
   private IngredientMapper ingredientMapper;

@@ -12,7 +12,16 @@ import java.util.EnumSet;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.reactive.server.WebTestClient;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -23,9 +32,11 @@ import tacos.Ingredient.Type;
 import tacos.SpiceLevel;
 import tacos.Taco;
 import tacos.api.mapper.IngredientMapper;
+import tacos.api.error.ApiExceptionHandler;
 import tacos.classification.TacoClassificationService;
 import tacos.data.IngredientRepository;
 import tacos.data.TacoRepository;
+import tacos.design.TacoDesignTestSupport;
 
 public class TacoControllerTest {
 
@@ -84,7 +95,7 @@ public class TacoControllerTest {
         .uri("/api/tacos")
         .contentType(MediaType.APPLICATION_JSON)
         .bodyValue("{\"name\":\"Test taco\",\"ingredients\":["
-            + "{\"id\":\"INGA\"},{\"id\":\"INGB\"}]}")
+            + "{\"id\":\"INGA\"},{\"id\":\"INGB\"},{\"id\":\"INGC\"}]}")
       .exchange()
       .expectStatus().isCreated()
       .expectBody()
@@ -132,24 +143,83 @@ public class TacoControllerTest {
     verify(tacoRepo, never()).save(any());
   }
 
+  @Test
+  void shouldValidateDesignWithoutSavingIt() {
+    TacoRepository tacoRepo = Mockito.mock(TacoRepository.class);
+    IngredientRepository ingredientRepo = ingredients();
+    WebTestClient client = WebTestClient.bindToController(
+        controller(tacoRepo, ingredientRepo)).build();
+
+    client.post().uri("/api/tacos/validate")
+        .contentType(MediaType.APPLICATION_JSON)
+        .bodyValue("{\"name\":\"Valid taco\",\"ingredients\":["
+            + "{\"id\":\"INGA\"},{\"id\":\"INGB\"},{\"id\":\"INGC\"}]}")
+        .exchange().expectStatus().isOk().expectBody()
+        .jsonPath("$.valid").isEqualTo(true)
+        .jsonPath("$.violations").isArray()
+        .jsonPath("$.violations[0]").doesNotExist();
+    verify(tacoRepo, never()).save(any());
+  }
+
+  @Test
+  void shouldReturnAllDesignViolationsAndRejectCreation() throws Exception {
+    TacoRepository tacoRepo = Mockito.mock(TacoRepository.class);
+    IngredientRepository ingredientRepo = ingredients();
+    WebTestClient client = WebTestClient.bindToController(
+        controller(tacoRepo, ingredientRepo)).build();
+    String body = "{\"name\":\"Wrong taco\",\"ingredients\":["
+        + "{\"id\":\"INGA\"},{\"id\":\"INGA\"},{\"id\":\"INGB\"}]}";
+
+    client.post().uri("/api/tacos/validate")
+        .contentType(MediaType.APPLICATION_JSON).bodyValue(body)
+        .exchange().expectStatus().isOk().expectBody()
+        .jsonPath("$.valid").isEqualTo(false)
+        .jsonPath("$.violations[0].code").isEqualTo("TACO_BASE_COUNT")
+        .jsonPath("$.violations[1].code").isEqualTo("TACO_DUPLICATE_INGREDIENT")
+        .jsonPath("$.violations[2].code").isEqualTo("TACO_PROTEIN_NEEDS_SAUCE");
+    MockMvc mvc = MockMvcBuilders.standaloneSetup(
+        controller(tacoRepo, ingredientRepo))
+        .setControllerAdvice(new ApiExceptionHandler()).build();
+    MvcResult pending = mvc.perform(post("/api/tacos")
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(request().asyncStarted()).andReturn();
+    mvc.perform(asyncDispatch(pending))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("TACO_DESIGN_INVALID"))
+        .andExpect(jsonPath("$.violations[2].code")
+            .value("TACO_PROTEIN_NEEDS_SAUCE"));
+    verify(tacoRepo, never()).save(any());
+  }
+
   private TacoController controller(
       TacoRepository tacoRepo, IngredientRepository ingredientRepo) {
     return new TacoController(tacoRepo,
-        new TacoClassificationService(ingredientRepo), new IngredientMapper());
+        new TacoClassificationService(ingredientRepo), new IngredientMapper(),
+        TacoDesignTestSupport.validator(ingredientRepo));
   }
 
   private IngredientRepository ingredients() {
     IngredientRepository repo = Mockito.mock(IngredientRepository.class);
     Ingredient wrap = new Ingredient("INGA", "Ingredient A", Type.WRAP);
+    wrap.setAvailable(true);
+    wrap.setStockOnHand(20);
     wrap.setDietaryTags(EnumSet.of(DietaryTag.VEGAN,
         DietaryTag.VEGETARIAN));
     wrap.setAllergens(EnumSet.of(Allergen.GLUTEN));
     wrap.setSpiceLevel(SpiceLevel.NONE);
     Ingredient protein = new Ingredient("INGB", "Ingredient B", Type.PROTEIN);
+    protein.setAvailable(true);
+    protein.setStockOnHand(20);
     protein.setDietaryTags(EnumSet.of(DietaryTag.VEGETARIAN));
     protein.setSpiceLevel(SpiceLevel.NONE);
     when(repo.findById("INGA")).thenReturn(Mono.just(wrap));
     when(repo.findById("INGB")).thenReturn(Mono.just(protein));
+    Ingredient sauce = new Ingredient("INGC", "Ingredient C", Type.SAUCE);
+    sauce.setAvailable(true);
+    sauce.setStockOnHand(20);
+    sauce.setDietaryTags(EnumSet.of(DietaryTag.VEGETARIAN));
+    sauce.setSpiceLevel(SpiceLevel.NONE);
+    when(repo.findById("INGC")).thenReturn(Mono.just(sauce));
     return repo;
   }
 

@@ -57,18 +57,22 @@ class SecurityAuthorizationTest {
     mvc.perform(post("/api/orders").with(csrf())).andExpect(status().isOk());
     mvc.perform(post("/api/payment-methods/tokenize").with(csrf()))
         .andExpect(status().isOk());
+    mvc.perform(post("/api/tacos/validate").with(csrf()))
+        .andExpect(status().isOk());
   }
 
   @Test
   @WithMockUser(roles = "USER")
   void shouldRequireCsrfForAuthenticatedWrites() throws Exception {
     mvc.perform(post("/api/orders")).andExpect(status().isForbidden());
+    mvc.perform(post("/api/tacos/validate")).andExpect(status().isForbidden());
   }
 
   @Test
   @WithMockUser(roles = "USER")
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
+    mvc.perform(post("/api/tacos").with(csrf())).andExpect(status().isForbidden());
     mvc.perform(post("/api/kitchen/queue").with(csrf())).andExpect(status().isForbidden());
     mvc.perform(patch("/api/admin/ingredients/FLTO/catalog").with(csrf()))
         .andExpect(status().isForbidden());
@@ -133,6 +137,7 @@ class SecurityAuthorizationTest {
     }
 
     @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
+        "/api/tacos/validate", "/api/tacos",
         "/api/payment-methods/tokenize",
         "/api/admin/ingredients/FLTO/stock-adjustments"})
     String write() {

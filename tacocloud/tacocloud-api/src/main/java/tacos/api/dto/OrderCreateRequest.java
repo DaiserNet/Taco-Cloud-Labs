@@ -78,7 +78,7 @@ public class OrderCreateRequest {
     private String name;
 
     @NotNull(message = "must be provided")
-    @Size(min = 1, max = 20, message = "must contain between 1 and 20 ingredients")
+    @Size(max = 50, message = "must contain at most 50 ingredients")
     private List<@NotBlank(message = "must not be blank")
         @Size(max = 64, message = "must contain at most 64 characters")
         @Pattern(regexp = "[A-Za-z0-9_-]+",
