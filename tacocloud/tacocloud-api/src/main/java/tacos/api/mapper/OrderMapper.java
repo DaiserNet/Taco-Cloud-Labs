@@ -24,6 +24,7 @@ public class OrderMapper {
     order.setDeliveryState(request.getDeliveryState());
     order.setDeliveryZip(request.getDeliveryZip());
     order.setPaymentMethodId(request.getPaymentMethodId());
+    order.setCouponCode(request.getCouponCode());
     order.setItems(safe(request.getItems()).stream()
         .map(this::toEntityLine)
         .collect(Collectors.toList()));
@@ -45,6 +46,8 @@ public class OrderMapper {
     response.setPaymentLast4(order.getPaymentLast4());
     response.setCurrency(order.getCurrency());
     response.setSubtotal(order.getSubtotal());
+    response.setCouponApplied(order.isCouponApplied());
+    response.setDiscount(order.getDiscount());
     response.setTotal(order.getTotal());
     response.setItems(responseLines(order).stream()
         .map(this::toResponseLine)

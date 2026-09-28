@@ -20,6 +20,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
+import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
 
 @Service
@@ -32,11 +33,12 @@ public class OrderService {
   private final Validator validator;
   private final PaymentMethodService paymentMethodService;
   private final OrderPricingService orderPricingService;
+  private final CouponService couponService;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
       OrderMessagingService orderMessages, UserRepository userRepo,
       Validator validator, PaymentMethodService paymentMethodService,
-      OrderPricingService orderPricingService) {
+      OrderPricingService orderPricingService, CouponService couponService) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
     this.orderMessages = orderMessages;
@@ -44,6 +46,7 @@ public class OrderService {
     this.validator = validator;
     this.paymentMethodService = paymentMethodService;
     this.orderPricingService = orderPricingService;
+    this.couponService = couponService;
   }
 
   public Flux<TacoOrder> findVisibleOrders(Authentication authentication) {
@@ -67,6 +70,7 @@ public class OrderService {
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
             .flatMap(payment -> orderPricingService.price(order)
+                .flatMap(couponService::apply)
                 .flatMap(pricedOrder -> {
                   pricedOrder.setUser(user);
                   pricedOrder.setPaymentBrand(payment.getBrand());
@@ -93,6 +97,7 @@ public class OrderService {
             ? Mono.just(order)
             : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)))
         .flatMap(orderPricingService::price)
+        .flatMap(couponService::apply)
         .flatMap(repo::save)
         .flatMap(savedOrder -> Mono.fromRunnable(
             () -> orderMessages.sendOrder(savedOrder))

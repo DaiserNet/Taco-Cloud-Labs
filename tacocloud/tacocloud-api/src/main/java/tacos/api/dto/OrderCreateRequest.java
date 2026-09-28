@@ -40,6 +40,11 @@ public class OrderCreateRequest {
   @Size(max = 64, message = "must contain at most 64 characters")
   private String paymentMethodId;
 
+  @Size(max = 64, message = "must contain at most 64 characters")
+  @Pattern(regexp = "[A-Za-z0-9_-]+",
+      message = "must be an alphanumeric code")
+  private String couponCode;
+
   @NotNull(message = "must be provided")
   @Size(min = 1, max = 50, message = "must contain between 1 and 50 items")
   @Valid

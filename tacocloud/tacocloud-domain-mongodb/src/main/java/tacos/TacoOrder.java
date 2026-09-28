@@ -52,6 +52,13 @@ public class TacoOrder implements Serializable {
 
   private BigDecimal subtotal = new BigDecimal("0.00");
 
+  @JsonIgnore
+  private String couponCode;
+
+  private boolean couponApplied;
+
+  private BigDecimal discount = new BigDecimal("0.00");
+
   private BigDecimal total = new BigDecimal("0.00");
 
   @JsonIgnore

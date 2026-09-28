@@ -45,6 +45,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,7 +73,8 @@ class OrderPutDeleteControllerTest {
     OrderService orderService = new OrderService(
         repo, emailOrderService, orderMessages, userRepo, validator,
         org.mockito.Mockito.mock(tacos.payment.PaymentMethodService.class),
-        org.mockito.Mockito.mock(OrderPricingService.class));
+        org.mockito.Mockito.mock(OrderPricingService.class),
+        org.mockito.Mockito.mock(CouponService.class));
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 

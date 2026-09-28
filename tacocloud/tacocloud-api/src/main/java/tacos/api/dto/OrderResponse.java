@@ -22,6 +22,8 @@ public class OrderResponse {
   private String paymentLast4;
   private String currency;
   private BigDecimal subtotal;
+  private boolean couponApplied;
+  private BigDecimal discount;
   private BigDecimal total;
   private List<OrderItem> items;
 

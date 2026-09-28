@@ -28,6 +28,7 @@ import tacos.web.api.EmailOrderConversionException;
 import tacos.catalog.IngredientCatalogValidationException;
 import tacos.catalog.IngredientVersionConflictException;
 import tacos.pricing.OrderPricingException;
+import tacos.pricing.CouponValidationException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -139,6 +140,13 @@ public class ApiExceptionHandler {
   public ResponseEntity<ApiProblem> handleOrderPricing(
       OrderPricingException error, HttpServletRequest request) {
     return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid order pricing",
+        error.getMessage(), error.getCode(), Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(CouponValidationException.class)
+  public ResponseEntity<ApiProblem> handleCouponValidation(
+      CouponValidationException error, HttpServletRequest request) {
+    return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Coupon not applicable",
         error.getMessage(), error.getCode(), Collections.emptyList(), request);
   }
 

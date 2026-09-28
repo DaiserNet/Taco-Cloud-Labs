@@ -8,11 +8,6 @@ taco:
     pageSize: 10
 
 
-  discount:
-    codes:
-      abcdef: 10
-
-
 
 #logging:
 #  level:
@@ -93,6 +88,21 @@ tacocloud:
   order-pricing:
     currency: USD
     max-quantity: 10
+  coupons:
+    codes:
+      CLASS10:
+        type: PERCENTAGE
+        value: 10.00
+        starts-on: "2020-01-01"
+        expires-on: "2035-12-31"
+        minimum-subtotal: 10.00
+        maximum-discount: 20.00
+      WELCOME5:
+        type: FIXED
+        value: 5.00
+        starts-on: "2020-01-01"
+        expires-on: "2035-12-31"
+        minimum-subtotal: 5.00
 
 ---
 spring:

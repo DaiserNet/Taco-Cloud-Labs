@@ -44,6 +44,7 @@ import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
 import tacos.security.RegistrationConflictException;
 import tacos.security.RegistrationController;
@@ -71,7 +72,7 @@ class ApiProblemControllerTest {
     OrderService orderService = new OrderService(orderRepo, emailOrderService,
         messaging, userRepo, mock(Validator.class),
         mock(tacos.payment.PaymentMethodService.class),
-        mock(OrderPricingService.class));
+        mock(OrderPricingService.class), mock(CouponService.class));
     OrderApiController orderController = new OrderApiController(
         orderService, new OrderMapper());
     mvc = MockMvcBuilders.standaloneSetup(

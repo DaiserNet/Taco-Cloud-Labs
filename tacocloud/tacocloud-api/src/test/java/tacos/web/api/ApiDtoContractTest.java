@@ -139,7 +139,8 @@ class ApiDtoContractTest {
     assertEquals(new LinkedHashSet<>(Arrays.asList(
         "id", "placedAt", "status", "userId", "deliveryName", "deliveryStreet",
         "deliveryCity", "deliveryState", "deliveryZip", "paymentBrand",
-        "paymentLast4", "currency", "subtotal", "total", "items")),
+        "paymentLast4", "currency", "subtotal", "discount", "total",
+        "couponApplied", "items")),
         actualFields);
     assertEquals("USER-ID", json.get("userId").asText());
     assertEquals("1111", json.get("paymentLast4").asText());

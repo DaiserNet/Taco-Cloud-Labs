@@ -4,19 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
 import java.security.Principal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 
 import javax.validation.Validator;
@@ -46,10 +47,13 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
+import tacos.pricing.CouponProperties;
+import tacos.pricing.CouponProperties.CouponRule;
 import tacos.pricing.CouponService;
+import tacos.pricing.CouponType;
 import tacos.pricing.OrderPricingService;
 
-class OrderPricingControllerTest {
+class OrderCouponControllerTest {
 
   private OrderRepository orderRepo;
   private IngredientRepository ingredientRepo;
@@ -65,11 +69,14 @@ class OrderPricingControllerTest {
     userRepo = mock(UserRepository.class);
     paymentMethodService = mock(PaymentMethodService.class);
     messaging = mock(OrderMessagingService.class);
+
+    CouponProperties properties = new CouponProperties();
+    properties.getCodes().put("SAVE10", percentageRule());
+    CouponService couponService = new CouponService(properties,
+        Clock.fixed(Instant.parse("2026-09-27T12:00:00Z"), ZoneOffset.UTC),
+        "USD");
     OrderPricingService pricingService =
         new OrderPricingService(ingredientRepo, 10, "USD");
-    CouponService couponService = mock(CouponService.class);
-    when(couponService.apply(any(TacoOrder.class)))
-        .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     OrderService orderService = new OrderService(orderRepo,
         mock(EmailOrderService.class), messaging, userRepo,
         mock(Validator.class), paymentMethodService, pricingService,
@@ -81,8 +88,12 @@ class OrderPricingControllerTest {
   }
 
   @Test
-  void shouldCreateOrderWithQuantityAndServerCalculatedTotals() throws Exception {
-    prepareOwnerAndPayment();
+  void shouldPersistAppliedCouponOutcomeWithoutExposingItsCode() throws Exception {
+    User owner = owner();
+    when(userRepo.findByUsername("alice")).thenReturn(Mono.just(owner));
+    when(paymentMethodService.findOwned(eq("PAYMENT-ID"), any(Authentication.class)))
+        .thenReturn(Mono.just(new PaymentMethod(
+            owner, "tok_test", "VISA", "0002", "12/99")));
     when(ingredientRepo.findById("WRAP"))
         .thenReturn(Mono.just(ingredient("WRAP", "1.10")));
     when(ingredientRepo.findById("SLSA"))
@@ -93,60 +104,20 @@ class OrderPricingControllerTest {
       return Mono.just(order);
     });
 
-    ResultActions response = perform(post("/api/orders")
-        .content(validOrder(2)), user());
-
-    response.andExpect(status().isCreated())
-        .andExpect(jsonPath("$.id").value("ORDER-ID"))
-        .andExpect(jsonPath("$.currency").value("USD"))
-        .andExpect(jsonPath("$.items[0].quantity").value(2))
-        .andExpect(jsonPath("$.items[0].unitPriceAtPurchase").value(1.45))
-        .andExpect(jsonPath("$.items[0].subtotal").value(2.90))
+    perform(post("/api/orders").content(validOrder()), user())
+        .andExpect(status().isCreated())
         .andExpect(jsonPath("$.subtotal").value(2.90))
-        .andExpect(jsonPath("$.total").value(2.90));
+        .andExpect(jsonPath("$.discount").value(0.29))
+        .andExpect(jsonPath("$.total").value(2.61))
+        .andExpect(jsonPath("$.couponApplied").value(true))
+        .andExpect(jsonPath("$.couponCode").doesNotExist());
 
-    ArgumentCaptor<TacoOrder> savedOrder = ArgumentCaptor.forClass(TacoOrder.class);
-    verify(orderRepo).save(savedOrder.capture());
-    assertEquals(new BigDecimal("1.45"),
-        savedOrder.getValue().getItems().get(0).getUnitPriceAtPurchase());
-    verify(messaging).sendOrder(savedOrder.getValue());
-  }
-
-  @Test
-  void shouldRejectClientSuppliedTotalBeforeAnyEffect() throws Exception {
-    mvc.perform(post("/api/orders").principal(user())
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(validOrder(2).replaceFirst("\\{", "{\"total\":0.01,")))
-        .andExpect(status().isBadRequest())
-        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
-
-    verifyNoInteractions(orderRepo, ingredientRepo, userRepo,
-        paymentMethodService, messaging);
-  }
-
-  @Test
-  void shouldRejectZeroQuantityBeforeAnyEffect() throws Exception {
-    mvc.perform(post("/api/orders").principal(user())
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(validOrder(0)))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
-
-    verifyNoInteractions(orderRepo, ingredientRepo, userRepo,
-        paymentMethodService, messaging);
-  }
-
-  @Test
-  void shouldRejectQuantityAboveConfiguredMaximumWithoutSaving() throws Exception {
-    prepareOwnerAndPayment();
-
-    perform(post("/api/orders").content(validOrder(11)), user())
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.code").value("ORDER_QUANTITY_INVALID"));
-
-    verifyNoInteractions(ingredientRepo, messaging);
-    verify(orderRepo, never()).save(any(TacoOrder.class));
+    ArgumentCaptor<TacoOrder> saved = ArgumentCaptor.forClass(TacoOrder.class);
+    verify(orderRepo).save(saved.capture());
+    assertEquals("SAVE10", saved.getValue().getCouponCode());
+    assertEquals(new BigDecimal("0.29"), saved.getValue().getDiscount());
+    assertEquals(new BigDecimal("2.61"), saved.getValue().getTotal());
+    verify(messaging).sendOrder(saved.getValue());
   }
 
   private ResultActions perform(
@@ -159,21 +130,23 @@ class OrderPricingControllerTest {
     return mvc.perform(asyncDispatch(pending));
   }
 
-  private void prepareOwnerAndPayment() {
-    User owner = owner();
-    when(userRepo.findByUsername("alice")).thenReturn(Mono.just(owner));
-    when(paymentMethodService.findOwned(eq("PAYMENT-ID"), any(Authentication.class)))
-        .thenReturn(Mono.just(new PaymentMethod(
-            owner, "tok_test", "VISA", "0002", "12/99")));
-  }
-
-  private String validOrder(int quantity) {
+  private String validOrder() {
     return "{\"deliveryName\":\"Alice\",\"deliveryStreet\":\"Street\","
         + "\"deliveryCity\":\"City\",\"deliveryState\":\"ST\","
         + "\"deliveryZip\":\"00000\",\"paymentMethodId\":\"PAYMENT-ID\","
-        + "\"items\":[{\"taco\":{\"name\":\"Valid taco\","
-        + "\"ingredientIds\":[\"WRAP\",\"SLSA\"]},\"quantity\":"
-        + quantity + "}]}";
+        + "\"couponCode\":\"save10\",\"items\":[{\"taco\":{"
+        + "\"name\":\"Valid taco\",\"ingredientIds\":[\"WRAP\",\"SLSA\"]},"
+        + "\"quantity\":2}]}";
+  }
+
+  private CouponRule percentageRule() {
+    CouponRule rule = new CouponRule();
+    rule.setType(CouponType.PERCENTAGE);
+    rule.setValue(new BigDecimal("10.00"));
+    rule.setStartsOn(LocalDate.of(2026, 1, 1));
+    rule.setExpiresOn(LocalDate.of(2026, 12, 31));
+    rule.setMinimumSubtotal(BigDecimal.ZERO);
+    return rule;
   }
 
   private Ingredient ingredient(String id, String price) {
