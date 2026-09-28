@@ -42,6 +42,8 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.inventory.InventoryReservation;
+import tacos.inventory.InventoryService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
 
@@ -53,6 +55,7 @@ class OrderFromEmailControllerTest {
   private UserRepository userRepo;
   private OrderPricingService orderPricingService;
   private CouponService couponService;
+  private InventoryService inventoryService;
   private OrderApiController controller;
 
   @BeforeEach
@@ -63,6 +66,14 @@ class OrderFromEmailControllerTest {
     userRepo = mock(UserRepository.class);
     orderPricingService = mock(OrderPricingService.class);
     couponService = mock(CouponService.class);
+    inventoryService = mock(InventoryService.class);
+    InventoryReservation reservation = mock(InventoryReservation.class);
+    when(reservation.getId()).thenReturn("RESERVATION-ID");
+    when(inventoryService.reserve(any(TacoOrder.class)))
+        .thenReturn(Mono.just(reservation));
+    when(inventoryService.accept(any(String.class), any(String.class)))
+        .thenReturn(Mono.empty());
+    when(inventoryService.release(any(String.class))).thenReturn(Mono.empty());
     when(orderPricingService.price(any(TacoOrder.class)))
         .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     when(couponService.apply(any(TacoOrder.class)))
@@ -70,7 +81,7 @@ class OrderFromEmailControllerTest {
     OrderService orderService = new OrderService(
         repo, emailOrderService, messaging, userRepo, mock(Validator.class),
         mock(tacos.payment.PaymentMethodService.class), orderPricingService,
-        couponService);
+        couponService, inventoryService);
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 
@@ -123,6 +134,7 @@ class OrderFromEmailControllerTest {
         .verify();
 
     verifyNoInteractions(messaging);
+    verify(inventoryService).release("RESERVATION-ID");
   }
 
   @Test
@@ -150,6 +162,7 @@ class OrderFromEmailControllerTest {
   void shouldPropagatePublishFailureInsteadOfCompletingSuccessfully() {
     TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
+    saved.setId("ORDER-ID");
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
         .thenReturn(Mono.just(converted));
     when(repo.save(converted)).thenReturn(Mono.just(saved));

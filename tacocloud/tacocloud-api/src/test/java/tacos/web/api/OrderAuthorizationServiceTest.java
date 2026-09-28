@@ -30,6 +30,8 @@ import tacos.User;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.inventory.InventoryReservation;
+import tacos.inventory.InventoryService;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
@@ -43,6 +45,8 @@ class OrderAuthorizationServiceTest {
   private PaymentMethodService paymentMethodService;
   private OrderPricingService orderPricingService;
   private CouponService couponService;
+  private InventoryService inventoryService;
+  private InventoryReservation inventoryReservation;
   private OrderService service;
 
   @BeforeEach
@@ -54,9 +58,16 @@ class OrderAuthorizationServiceTest {
     paymentMethodService = mock(PaymentMethodService.class);
     orderPricingService = mock(OrderPricingService.class);
     couponService = mock(CouponService.class);
+    inventoryService = mock(InventoryService.class);
+    inventoryReservation = mock(InventoryReservation.class);
+    when(inventoryReservation.getId()).thenReturn("RESERVATION-ID");
+    when(inventoryService.reserve(any(TacoOrder.class)))
+        .thenReturn(Mono.just(inventoryReservation));
+    when(inventoryService.accept(any(String.class), any(String.class)))
+        .thenReturn(Mono.empty());
     service = new OrderService(orderRepo, emailOrderService, messaging,
         userRepo, mock(Validator.class), paymentMethodService,
-        orderPricingService, couponService);
+        orderPricingService, couponService, inventoryService);
   }
 
   @Test
@@ -111,9 +122,9 @@ class OrderAuthorizationServiceTest {
         })
         .verifyComplete();
 
-    InOrder effects = inOrder(messaging, orderRepo);
-    effects.verify(messaging).sendOrder(requested);
+    InOrder effects = inOrder(orderRepo, messaging);
     effects.verify(orderRepo).save(requested);
+    effects.verify(messaging).sendOrder(requested);
   }
 
   @Test

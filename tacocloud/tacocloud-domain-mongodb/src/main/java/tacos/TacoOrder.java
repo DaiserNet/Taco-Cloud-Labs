@@ -62,6 +62,9 @@ public class TacoOrder implements Serializable {
   private BigDecimal total = new BigDecimal("0.00");
 
   @JsonIgnore
+  private String inventoryReservationId;
+
+  @JsonIgnore
   private List<Taco> tacos = new ArrayList<>();
 
   public void addItem(OrderLine item) {

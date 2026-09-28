@@ -46,6 +46,8 @@ import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.inventory.InventoryReservation;
+import tacos.inventory.InventoryService;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponProperties;
 import tacos.pricing.CouponProperties.CouponRule;
@@ -77,10 +79,17 @@ class OrderCouponControllerTest {
         "USD");
     OrderPricingService pricingService =
         new OrderPricingService(ingredientRepo, 10, "USD");
+    InventoryService inventoryService = mock(InventoryService.class);
+    InventoryReservation reservation = mock(InventoryReservation.class);
+    when(reservation.getId()).thenReturn("RESERVATION-ID");
+    when(inventoryService.reserve(any(TacoOrder.class)))
+        .thenReturn(Mono.just(reservation));
+    when(inventoryService.accept(any(String.class), any(String.class)))
+        .thenReturn(Mono.empty());
     OrderService orderService = new OrderService(orderRepo,
         mock(EmailOrderService.class), messaging, userRepo,
         mock(Validator.class), paymentMethodService, pricingService,
-        couponService);
+        couponService, inventoryService);
     mvc = MockMvcBuilders.standaloneSetup(
         new OrderApiController(orderService, new OrderMapper()))
         .setControllerAdvice(new ApiExceptionHandler())

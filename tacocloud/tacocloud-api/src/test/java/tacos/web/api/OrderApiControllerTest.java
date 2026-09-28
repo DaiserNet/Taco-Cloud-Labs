@@ -40,6 +40,7 @@ import tacos.api.error.ApiExceptionHandler;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
+import tacos.inventory.InventoryService;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
@@ -80,6 +81,9 @@ public class OrderApiControllerTest {
 
     @MockBean
     private CouponService couponService;
+
+    @MockBean
+    private InventoryService inventoryService;
 
     @Test 
     public void shouldPatchZipWithoutChangingState() {

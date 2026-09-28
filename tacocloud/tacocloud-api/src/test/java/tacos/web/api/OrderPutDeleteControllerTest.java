@@ -44,6 +44,7 @@ import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
+import tacos.inventory.InventoryService;
 import tacos.messaging.OrderMessagingService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
@@ -66,15 +67,21 @@ class OrderPutDeleteControllerTest {
   @Mock
   private UserRepository userRepo;
 
+  @Mock
+  private InventoryService inventoryService;
+
   private OrderApiController controller;
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient()
+        .when(inventoryService.release(any(String.class)))
+        .thenReturn(Mono.empty());
     OrderService orderService = new OrderService(
         repo, emailOrderService, orderMessages, userRepo, validator,
         org.mockito.Mockito.mock(tacos.payment.PaymentMethodService.class),
         org.mockito.Mockito.mock(OrderPricingService.class),
-        org.mockito.Mockito.mock(CouponService.class));
+        org.mockito.Mockito.mock(CouponService.class), inventoryService);
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 
@@ -182,6 +189,7 @@ class OrderPutDeleteControllerTest {
         .verifyComplete();
 
     verify(repo, times(1)).deleteById("ORDER1");
+    verify(inventoryService).release("RESERVATION-ORDER1");
   }
 
   @Test
@@ -238,6 +246,7 @@ class OrderPutDeleteControllerTest {
     order.setId(id);
     order.setUser(user);
     order.setStatus(OrderStatus.PLACED);
+    order.setInventoryReservationId("RESERVATION-" + id);
     return order;
   }
 

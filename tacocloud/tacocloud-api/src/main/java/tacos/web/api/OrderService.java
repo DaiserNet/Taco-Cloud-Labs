@@ -18,6 +18,8 @@ import tacos.TacoOrder;
 import tacos.User;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
+import tacos.inventory.InventoryReservation;
+import tacos.inventory.InventoryService;
 import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
@@ -34,11 +36,13 @@ public class OrderService {
   private final PaymentMethodService paymentMethodService;
   private final OrderPricingService orderPricingService;
   private final CouponService couponService;
+  private final InventoryService inventoryService;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
       OrderMessagingService orderMessages, UserRepository userRepo,
       Validator validator, PaymentMethodService paymentMethodService,
-      OrderPricingService orderPricingService, CouponService couponService) {
+      OrderPricingService orderPricingService, CouponService couponService,
+      InventoryService inventoryService) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
     this.orderMessages = orderMessages;
@@ -47,6 +51,7 @@ public class OrderService {
     this.paymentMethodService = paymentMethodService;
     this.orderPricingService = orderPricingService;
     this.couponService = couponService;
+    this.inventoryService = inventoryService;
   }
 
   public Flux<TacoOrder> findVisibleOrders(Authentication authentication) {
@@ -75,10 +80,9 @@ public class OrderService {
                   pricedOrder.setUser(user);
                   pricedOrder.setPaymentBrand(payment.getBrand());
                   pricedOrder.setPaymentLast4(payment.getLast4());
-                  return Mono.fromRunnable(
-                      () -> orderMessages.sendOrder(pricedOrder))
-                      .then(Mono.defer(() -> repo.save(pricedOrder)));
-                })));
+                  return reserveSaveAndAccept(pricedOrder);
+                })
+                .flatMap(this::publish)));
   }
 
   public Mono<TacoOrder> createFromEmail(
@@ -98,10 +102,8 @@ public class OrderService {
             : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)))
         .flatMap(orderPricingService::price)
         .flatMap(couponService::apply)
-        .flatMap(repo::save)
-        .flatMap(savedOrder -> Mono.fromRunnable(
-            () -> orderMessages.sendOrder(savedOrder))
-            .thenReturn(savedOrder));
+        .flatMap(this::reserveSaveAndAccept)
+        .flatMap(this::publish);
   }
 
   public Mono<TacoOrder> patchOrder(
@@ -129,7 +131,46 @@ public class OrderService {
 
   public Mono<Void> deleteOrder(String orderId, Authentication authentication) {
     return findAuthorizedEditable(orderId, authentication)
-        .flatMap(order -> repo.deleteById(orderId));
+        .flatMap(order -> inventoryService
+            .release(order.getInventoryReservationId())
+            .then(repo.deleteById(orderId)));
+  }
+
+  private Mono<TacoOrder> reserveSaveAndAccept(TacoOrder order) {
+    return inventoryService.reserve(order)
+        .flatMap(reservation -> saveReservedOrder(order, reservation));
+  }
+
+  private Mono<TacoOrder> saveReservedOrder(
+      TacoOrder order, InventoryReservation reservation) {
+    return Mono.defer(() -> repo.save(order))
+        .onErrorResume(error -> releaseAndPropagate(reservation, error))
+        .flatMap(savedOrder -> inventoryService
+            .accept(reservation.getId(), savedOrder.getId())
+            .thenReturn(savedOrder)
+            .onErrorResume(error -> compensateUnacceptedOrder(
+                savedOrder, reservation, error)));
+  }
+
+  private Mono<TacoOrder> compensateUnacceptedOrder(
+      TacoOrder order, InventoryReservation reservation, Throwable error) {
+    return Mono.defer(() -> repo.deleteById(order.getId()))
+        .onErrorResume(deleteError -> Mono.defer(() -> inventoryService
+            .release(reservation.getId()))
+            .then(Mono.error(deleteError)))
+        .then(Mono.defer(() -> inventoryService.release(reservation.getId())))
+        .then(Mono.error(error));
+  }
+
+  private <T> Mono<T> releaseAndPropagate(
+      InventoryReservation reservation, Throwable error) {
+    return inventoryService.release(reservation.getId())
+        .then(Mono.error(error));
+  }
+
+  private Mono<TacoOrder> publish(TacoOrder order) {
+    return Mono.fromRunnable(() -> orderMessages.sendOrder(order))
+        .thenReturn(order);
   }
 
   private Mono<TacoOrder> findAuthorizedEditable(

@@ -27,6 +27,7 @@ import tacos.security.RegistrationConflictException;
 import tacos.web.api.EmailOrderConversionException;
 import tacos.catalog.IngredientCatalogValidationException;
 import tacos.catalog.IngredientVersionConflictException;
+import tacos.inventory.InventoryReservationException;
 import tacos.pricing.OrderPricingException;
 import tacos.pricing.CouponValidationException;
 
@@ -147,6 +148,15 @@ public class ApiExceptionHandler {
   public ResponseEntity<ApiProblem> handleCouponValidation(
       CouponValidationException error, HttpServletRequest request) {
     return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Coupon not applicable",
+        error.getMessage(), error.getCode(), Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(InventoryReservationException.class)
+  public ResponseEntity<ApiProblem> handleInventoryReservation(
+      InventoryReservationException error, HttpServletRequest request) {
+    HttpStatus status = "INVENTORY_RESERVATION_INVALID".equals(error.getCode())
+        ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.CONFLICT;
+    return problem(status, "Inventory reservation failed",
         error.getMessage(), error.getCode(), Collections.emptyList(), request);
   }
 
