@@ -1,6 +1,8 @@
 package tacos;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.DecimalMin;
@@ -47,6 +49,9 @@ public class Ingredient {
 
   @Version
   private Long version;
+
+  @JsonIgnore
+  private Set<String> inventoryReservationIds = new HashSet<>();
 
   public Ingredient(String id, String name, Type type) {
     this(id, name, type, new BigDecimal("0.00"), false, 0, 0);

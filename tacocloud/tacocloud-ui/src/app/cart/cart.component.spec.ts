@@ -24,6 +24,8 @@ describe('CartComponent order payload', () => {
     component.onSubmit();
 
     const request = httpClient.post.calls.argsFor(1)[1];
+    expect(httpClient.post.calls.argsFor(0)[0]).toBe('/api/payment-methods/tokenize');
+    expect(httpClient.post.calls.argsFor(1)[0]).toBe('/api/orders');
     expect(request.items[0].quantity).toBe(3);
     expect(request.items[0].taco).toEqual({
       name: 'Quantity taco',

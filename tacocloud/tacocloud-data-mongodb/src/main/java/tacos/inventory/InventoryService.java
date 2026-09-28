@@ -68,8 +68,9 @@ public class InventoryService {
           .set("orderId", orderId);
       return mongo.updateFirst(query, update, InventoryReservation.class)
           .flatMap(result -> result.getModifiedCount() == 1
-              ? Mono.<Void>empty()
-              : acceptedAlready(reservationId, orderId));
+              ? Mono.just(true)
+              : acceptedAlready(reservationId, orderId))
+          .then();
     });
   }
 
@@ -78,11 +79,12 @@ public class InventoryService {
       return Mono.empty();
     }
     return claimForRelease(reservationId)
+        .switchIfEmpty(Mono.defer(() -> releasingAlready(reservationId)))
         .flatMap(reservation -> Flux.fromIterable(
-                safe(reservation.getReservedItems()))
-            .concatMap(this::releaseItem)
+                safe(reservation.getItems()))
+            .concatMap(item -> releaseItem(reservationId, item))
             .then(markReleased(reservationId)))
-        .switchIfEmpty(releasedAlready(reservationId));
+        .then();
   }
 
   private Mono<InventoryReservation> reserveAll(
@@ -98,17 +100,17 @@ public class InventoryService {
       String reservationId, InventoryReservationItem item) {
     Query stockAvailable = Query.query(where("_id").is(item.getIngredientId())
         .and("available").is(true)
-        .and("stockOnHand").gte(item.getQuantity()));
-    Update decrement = new Update().inc("stockOnHand", -item.getQuantity());
+        .and("stockOnHand").gte(item.getQuantity())
+        .and("inventoryReservationIds").ne(reservationId));
+    Update decrement = new Update()
+        .inc("stockOnHand", -item.getQuantity())
+        .addToSet("inventoryReservationIds", reservationId);
 
     return mongo.findAndModify(stockAvailable, decrement,
             FindAndModifyOptions.options().returnNew(true), Ingredient.class)
         .switchIfEmpty(Mono.error(new InsufficientStockException(
             item.getIngredientId(), item.getQuantity())))
-        .flatMap(ingredient -> recordReservedItem(reservationId, item)
-            .then(ingredient.getStockOnHand() == 0
-                ? markUnavailableIfEmpty(ingredient.getId())
-                : Mono.empty()));
+        .flatMap(ingredient -> recordReservedItem(reservationId, item));
   }
 
   private Mono<Void> recordReservedItem(
@@ -116,20 +118,12 @@ public class InventoryService {
     Query reserving = Query.query(where("_id").is(reservationId)
         .and("status").is(InventoryReservationStatus.RESERVING));
     return mongo.updateFirst(reserving,
-            new Update().push("reservedItems", item),
+            new Update().addToSet("reservedItems", item),
             InventoryReservation.class)
         .flatMap(result -> result.getModifiedCount() == 1
             ? Mono.<Void>empty()
             : Mono.error(conflict(
                 "Reservation changed while stock was being reserved.")));
-  }
-
-  private Mono<Void> markUnavailableIfEmpty(String ingredientId) {
-    Query emptyStock = Query.query(where("_id").is(ingredientId)
-        .and("stockOnHand").is(0));
-    return mongo.updateFirst(emptyStock, new Update().set("available", false),
-            Ingredient.class)
-        .then();
   }
 
   private Mono<InventoryReservation> markReserved(String reservationId) {
@@ -173,17 +167,23 @@ public class InventoryService {
         InventoryReservation.class);
   }
 
-  private Mono<Void> releaseItem(InventoryReservationItem item) {
-    Query ingredient = Query.query(where("_id").is(item.getIngredientId()));
+  private Mono<Void> releaseItem(
+      String reservationId, InventoryReservationItem item) {
+    Query ingredient = Query.query(where("_id").is(item.getIngredientId())
+        .and("inventoryReservationIds").is(reservationId));
     Update restore = new Update()
         .inc("stockOnHand", item.getQuantity())
-        .set("available", true);
+        .pull("inventoryReservationIds", reservationId);
     return mongo.updateFirst(ingredient, restore, Ingredient.class)
         .flatMap(result -> result.getMatchedCount() == 1
             ? Mono.<Void>empty()
-            : Mono.error(conflict(
-                "Reserved ingredient no longer exists: "
-                    + item.getIngredientId())));
+            : mongo.exists(Query.query(where("_id").is(item.getIngredientId())),
+                Ingredient.class)
+                .flatMap(exists -> exists
+                    ? Mono.<Void>empty()
+                    : Mono.error(conflict(
+                        "Reserved ingredient no longer exists: "
+                            + item.getIngredientId()))));
   }
 
   private Mono<Void> markReleased(String reservationId) {
@@ -193,30 +193,41 @@ public class InventoryService {
             new Update().set("status", InventoryReservationStatus.RELEASED),
             InventoryReservation.class)
         .flatMap(result -> result.getModifiedCount() == 1
-            ? Mono.<Void>empty()
-            : Mono.error(conflict(
-                "Reservation could not be marked as released.")));
+            ? Mono.just(true)
+            : releasedAlready(reservationId))
+        .then();
   }
 
-  private Mono<Void> releasedAlready(String reservationId) {
+  private Mono<InventoryReservation> releasingAlready(String reservationId) {
     return mongo.findById(reservationId, InventoryReservation.class)
         .flatMap(existing -> existing.getStatus()
-            == InventoryReservationStatus.RELEASED
-                ? Mono.<Void>empty()
-                : Mono.error(conflict(
-                    "Reservation is already being released.")))
-        .switchIfEmpty(Mono.empty());
+            == InventoryReservationStatus.RELEASING
+                ? Mono.just(existing)
+                : existing.getStatus() == InventoryReservationStatus.RELEASED
+                    ? Mono.empty()
+                    : Mono.error(conflict(
+                        "Reservation cannot be released in its current state.")));
   }
 
-  private Mono<Void> acceptedAlready(String reservationId, String orderId) {
+  private Mono<Boolean> releasedAlready(String reservationId) {
     return mongo.findById(reservationId, InventoryReservation.class)
+        .switchIfEmpty(Mono.error(conflict("Reservation was not found.")))
+        .flatMap(existing -> existing.getStatus()
+            == InventoryReservationStatus.RELEASED
+                ? Mono.just(true)
+                : Mono.error(conflict(
+                    "Reservation could not be marked as released.")));
+  }
+
+  private Mono<Boolean> acceptedAlready(String reservationId, String orderId) {
+    return mongo.findById(reservationId, InventoryReservation.class)
+        .switchIfEmpty(Mono.error(conflict("Reservation was not found.")))
         .flatMap(existing -> existing.getStatus()
                 == InventoryReservationStatus.ACCEPTED
             && orderId.equals(existing.getOrderId())
-                ? Mono.<Void>empty()
+                ? Mono.just(true)
                 : Mono.error(conflict(
-                    "Reservation cannot be accepted in its current state.")))
-        .switchIfEmpty(Mono.error(conflict("Reservation was not found.")));
+                    "Reservation cannot be accepted in its current state.")));
   }
 
   private List<InventoryReservationItem> requestedItems(TacoOrder order) {

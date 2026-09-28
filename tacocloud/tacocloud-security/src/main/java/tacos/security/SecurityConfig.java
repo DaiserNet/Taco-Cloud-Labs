@@ -17,6 +17,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 
@@ -35,6 +36,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
         .antMatchers("/", "/login", "/register", "/images/**", "/styles.css",
             "/favicon.ico").permitAll()
+        .antMatchers("/ui", "/ui/**", "/assets/**",
+            "/inline.bundle.js", "/polyfills.bundle.js",
+            "/styles.bundle.js", "/vendor.bundle.js", "/main.bundle.js",
+            "/Cloud_sm.*.png").permitAll()
         .antMatchers("/api/admin/**").hasRole("ADMIN")
         .antMatchers(HttpMethod.GET, "/api/tacos/**", "/api/ingredients/**").permitAll()
         .antMatchers("/api/ingredients/**", "/api/tacos/**").hasRole("ADMIN")
@@ -74,6 +79,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
       .and()
         .csrf()
+          .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
           .ignoringAntMatchers("/h2-console/**")
 
       // Allow pages to be loaded in frames from the same origin; needed for H2-Console

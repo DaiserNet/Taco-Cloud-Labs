@@ -1,5 +1,5 @@
 import { Component, OnInit, Injectable, Input } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router/';
 import { CartService } from '../cart/cart-service';
 
@@ -51,12 +51,10 @@ export class DesignComponent implements OnInit {
 
   // tag::onSubmit[]
   onSubmit() {
-    this.httpClient.post(
-        'http://localhost:8080/api/tacos',
-        this.model, {
-            headers: new HttpHeaders().set('Content-type', 'application/json'),
-        }).subscribe(taco => this.cart.addToCart(taco));
-
+    this.cart.addToCart({
+      name: this.model.name,
+      ingredients: this.model.ingredients.slice()
+    });
     this.router.navigate(['/cart']);
   }
   // end::onSubmit[]

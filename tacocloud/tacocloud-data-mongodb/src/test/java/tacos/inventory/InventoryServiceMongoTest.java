@@ -4,11 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +27,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
 import org.springframework.test.annotation.DirtiesContext;
 
@@ -94,7 +101,7 @@ class InventoryServiceMongoTest {
         .assertNext(result -> {
           assertNotEquals(result.getT1().getT1(), result.getT1().getT2());
           assertEquals(0, result.getT2().getStockOnHand());
-          assertFalse(result.getT2().isAvailable());
+          assertTrue(result.getT2().isAvailable());
         })
         .expectComplete()
         .verify(TEST_TIMEOUT);
@@ -170,6 +177,126 @@ class InventoryServiceMongoTest {
           assertEquals("ORDER-1", result.getT1().getOrderId());
           assertEquals(2, result.getT2().getStockOnHand());
           assertTrue(result.getT2().isAvailable());
+        })
+        .verifyComplete();
+  }
+
+  @Test
+  void shouldRestoreStockWhenRecordingReservationFailsAfterDecrement() {
+    TacoOrder order = order("RECORD-FAIL", 1, "RECORD-ITEM");
+    ReactiveMongoTemplate failingMongo = spy(mongo);
+    AtomicBoolean failOnce = new AtomicBoolean(true);
+    doAnswer(invocation -> failOnce.getAndSet(false)
+        ? Mono.error(new IllegalStateException("record write failed"))
+        : invocation.callRealMethod())
+        .when(failingMongo).updateFirst(any(Query.class),
+            any(Update.class), eq(InventoryReservation.class));
+    InventoryService failingService = new InventoryService(failingMongo);
+
+    StepVerifier.create(ingredientRepo.save(ingredient("RECORD-ITEM", 2))
+            .then(failingService.reserve(order)))
+        .expectErrorMatches(error -> error instanceof IllegalStateException
+            && "record write failed".equals(error.getMessage()))
+        .verify(TEST_TIMEOUT);
+
+    StepVerifier.create(Mono.zip(
+            ingredientRepo.findById("RECORD-ITEM"),
+            mongo.findById("RECORD-FAIL", InventoryReservation.class),
+            mongo.count(new Query(), TacoOrder.class)))
+        .assertNext(result -> {
+          assertEquals(2, result.getT1().getStockOnHand());
+          assertFalse(result.getT1().getInventoryReservationIds()
+              .contains("RECORD-FAIL"));
+          assertEquals(InventoryReservationStatus.RELEASED,
+              result.getT2().getStatus());
+          assertTrue(result.getT2().getReservedItems().isEmpty());
+          assertEquals(0, result.getT3());
+        })
+        .verifyComplete();
+  }
+
+  @Test
+  void shouldPreserveAdministrativeUnavailabilityWhenReleasing() {
+    TacoOrder order = order("ADMIN-OFF", 1, "OFF-ITEM");
+    ingredientRepo.save(ingredient("OFF-ITEM", 2))
+        .then(inventoryService.reserve(order))
+        .then(mongo.updateFirst(Query.query(
+                org.springframework.data.mongodb.core.query.Criteria
+                    .where("_id").is("OFF-ITEM")),
+            new Update().set("available", false), Ingredient.class))
+        .then(inventoryService.release("ADMIN-OFF"))
+        .then(ingredientRepo.findById("OFF-ITEM"))
+        .as(StepVerifier::create)
+        .assertNext(ingredient -> {
+          assertEquals(2, ingredient.getStockOnHand());
+          assertFalse(ingredient.isAvailable());
+        })
+        .verifyComplete();
+  }
+
+  @Test
+  void shouldAcceptSameReservationTwiceWithoutChangingStock() {
+    TacoOrder order = order("ACCEPT-TWICE", 1, "ACCEPT-ITEM");
+    ingredientRepo.save(ingredient("ACCEPT-ITEM", 2))
+        .then(inventoryService.reserve(order))
+        .then(inventoryService.accept("ACCEPT-TWICE", "ORDER-ACCEPT"))
+        .then(inventoryService.accept("ACCEPT-TWICE", "ORDER-ACCEPT"))
+        .then(Mono.zip(ingredientRepo.findById("ACCEPT-ITEM"),
+            mongo.findById("ACCEPT-TWICE", InventoryReservation.class)))
+        .as(StepVerifier::create)
+        .assertNext(result -> {
+          assertEquals(1, result.getT1().getStockOnHand());
+          assertEquals(InventoryReservationStatus.ACCEPTED,
+              result.getT2().getStatus());
+          assertEquals("ORDER-ACCEPT", result.getT2().getOrderId());
+        })
+        .verifyComplete();
+  }
+
+  @Test
+  void shouldRetryPartiallyFailedReleaseWithoutRestoringTwice() {
+    TacoOrder order = order("RELEASE-RETRY", 1, "FIRST", "SECOND");
+    ReactiveMongoTemplate failingMongo = spy(mongo);
+    AtomicInteger releaseWrites = new AtomicInteger();
+    doAnswer(invocation -> releaseWrites.incrementAndGet() == 2
+        ? Mono.error(new IllegalStateException("second release failed"))
+        : invocation.callRealMethod())
+        .when(failingMongo).updateFirst(any(Query.class),
+            any(Update.class), eq(Ingredient.class));
+    InventoryService failingService = new InventoryService(failingMongo);
+
+    Mono<Void> setup = ingredientRepo.save(ingredient("FIRST", 2))
+        .then(ingredientRepo.save(ingredient("SECOND", 2)))
+        .then(inventoryService.reserve(order))
+        .then();
+    StepVerifier.create(setup.then(failingService.release("RELEASE-RETRY")))
+        .expectErrorMatches(error -> error instanceof IllegalStateException
+            && "second release failed".equals(error.getMessage()))
+        .verify(TEST_TIMEOUT);
+
+    StepVerifier.create(Mono.zip(ingredientRepo.findById("FIRST"),
+            ingredientRepo.findById("SECOND"),
+            mongo.findById("RELEASE-RETRY", InventoryReservation.class)))
+        .assertNext(result -> {
+          assertEquals(2, result.getT1().getStockOnHand());
+          assertEquals(1, result.getT2().getStockOnHand());
+          assertEquals(InventoryReservationStatus.RELEASING,
+              result.getT3().getStatus());
+        })
+        .verifyComplete();
+
+    StepVerifier.create(inventoryService.release("RELEASE-RETRY")
+            .then(inventoryService.release("RELEASE-RETRY"))
+            .then(Mono.zip(ingredientRepo.findById("FIRST"),
+                ingredientRepo.findById("SECOND"),
+                mongo.findById("RELEASE-RETRY", InventoryReservation.class))))
+        .assertNext(result -> {
+          assertEquals(2, result.getT1().getStockOnHand());
+          assertEquals(2, result.getT2().getStockOnHand());
+          assertTrue(result.getT1().getInventoryReservationIds().isEmpty());
+          assertTrue(result.getT2().getInventoryReservationIds().isEmpty());
+          assertEquals(InventoryReservationStatus.RELEASED,
+              result.getT3().getStatus());
         })
         .verifyComplete();
   }

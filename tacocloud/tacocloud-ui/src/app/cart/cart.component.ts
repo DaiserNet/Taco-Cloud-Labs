@@ -55,14 +55,14 @@ export class CartComponent implements OnInit {
         }));
 
     this.httpClient.post<any>(
-        'http://localhost:8080/api/payment-methods/tokenize',
+        '/api/payment-methods/tokenize',
         this.payment, {
             headers: new HttpHeaders().set('Content-type', 'application/json')
                     .set('Accept', 'application/json'),
         }).switchMap(paymentMethod => {
           this.model.paymentMethodId = paymentMethod.paymentMethodId;
           return this.httpClient.post(
-              'http://localhost:8080/api/orders', this.model, {
+              '/api/orders', this.model, {
                 headers: new HttpHeaders().set('Content-type', 'application/json')
                         .set('Accept', 'application/json')
               });
