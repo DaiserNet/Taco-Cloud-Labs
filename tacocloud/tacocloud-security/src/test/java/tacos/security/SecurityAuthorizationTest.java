@@ -36,6 +36,8 @@ class SecurityAuthorizationTest {
   @Test
   void shouldAllowAnonymousCatalogReads() throws Exception {
     mvc.perform(get("/api/tacos/probe")).andExpect(status().isOk());
+    mvc.perform(get("/api/tacos/TACO1/classification"))
+        .andExpect(status().isOk());
     mvc.perform(get("/api/ingredients/probe")).andExpect(status().isOk());
   }
 
@@ -123,7 +125,8 @@ class SecurityAuthorizationTest {
   @RestController
   static class AuthorizationProbeController {
 
-    @GetMapping({"/api/tacos/probe", "/api/ingredients/probe", "/api/orders",
+    @GetMapping({"/api/tacos/probe", "/api/tacos/TACO1/classification",
+        "/api/ingredients/probe", "/api/orders",
         "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
     String read() {
       return "ok";

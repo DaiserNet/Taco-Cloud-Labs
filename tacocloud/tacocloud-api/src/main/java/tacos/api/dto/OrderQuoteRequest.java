@@ -29,6 +29,11 @@ public class OrderQuoteRequest {
       message = "must be an alphanumeric code")
   private String couponCode;
 
+  @Size(max = 64, message = "must contain at most 64 characters")
+  @Pattern(regexp = "[A-Za-z0-9_-]+",
+      message = "must be an alphanumeric identifier")
+  private String tacoId;
+
   @JsonAnySetter
   public void rejectUnknownField(String name, Object value) {
     throw new IllegalArgumentException("Field not allowed in order quote: " + name);

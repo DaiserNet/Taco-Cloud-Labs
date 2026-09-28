@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -23,7 +24,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import reactor.core.publisher.Flux;
 import tacos.Ingredient;
+import tacos.Allergen;
+import tacos.DietaryTag;
 import tacos.Ingredient.Type;
+import tacos.SpiceLevel;
 import tacos.OrderStatus;
 import tacos.TacoOrder;
 import tacos.User;
@@ -164,5 +168,33 @@ class ApiDtoContractTest {
     assertEquals(new Ingredient("TEST", "Test ingredient", Type.SAUCE), entity);
     assertEquals(new IngredientResponse("TEST", "Test ingredient", Type.SAUCE,
         new BigDecimal("0.00"), false), response);
+  }
+
+  @Test
+  void shouldExposeTypedIngredientMetadataAndPreserveItWhenPutOmitsIt() {
+    IngredientRequest request = new IngredientRequest();
+    request.setId("SLSA");
+    request.setName("Sesame salsa");
+    request.setType(Type.SAUCE);
+    request.setDietaryTags(EnumSet.of(DietaryTag.VEGAN,
+        DietaryTag.GLUTEN_FREE));
+    request.setAllergens(EnumSet.of(Allergen.SESAME));
+    request.setSpiceLevel(SpiceLevel.HOT);
+    IngredientMapper mapper = new IngredientMapper();
+
+    Ingredient entity = mapper.toEntity(request);
+    IngredientResponse response = mapper.toResponse(entity);
+    assertEquals(request.getDietaryTags(), response.getDietaryTags());
+    assertEquals(request.getAllergens(), response.getAllergens());
+    assertEquals(SpiceLevel.HOT, response.getSpiceLevel());
+
+    IngredientRequest oldClientPut = new IngredientRequest();
+    oldClientPut.setId("SLSA");
+    oldClientPut.setName("Renamed salsa");
+    oldClientPut.setType(Type.SAUCE);
+    mapper.updateEntity(oldClientPut, entity);
+    assertEquals(request.getDietaryTags(), entity.getDietaryTags());
+    assertEquals(request.getAllergens(), entity.getAllergens());
+    assertEquals(SpiceLevel.HOT, entity.getSpiceLevel());
   }
 }

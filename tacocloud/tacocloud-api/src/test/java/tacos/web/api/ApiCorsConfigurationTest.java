@@ -14,6 +14,8 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import tacos.api.mapper.IngredientMapper;
+import tacos.classification.TacoClassificationService;
 import tacos.data.TacoRepository;
 
 @WebMvcTest(TacoController.class)
@@ -29,6 +31,12 @@ class ApiCorsConfigurationTest {
 
   @MockBean
   private TacoRepository tacoRepo;
+
+  @MockBean
+  private TacoClassificationService classificationService;
+
+  @MockBean
+  private IngredientMapper ingredientMapper;
 
   @Test
   void shouldAllowConfiguredOriginForApiPreflight() throws Exception {

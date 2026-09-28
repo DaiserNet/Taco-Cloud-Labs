@@ -1,6 +1,7 @@
 package tacos;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -49,6 +50,12 @@ public class Ingredient {
 
   @Version
   private Long version;
+
+  private Set<DietaryTag> dietaryTags = EnumSet.noneOf(DietaryTag.class);
+
+  private Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
+
+  private SpiceLevel spiceLevel = SpiceLevel.UNKNOWN;
 
   @JsonIgnore
   private Set<String> inventoryReservationIds = new HashSet<>();

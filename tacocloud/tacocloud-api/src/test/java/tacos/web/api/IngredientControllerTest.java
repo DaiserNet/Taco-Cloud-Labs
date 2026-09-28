@@ -1,6 +1,7 @@
 package tacos.web.api;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
 
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
@@ -11,6 +12,9 @@ import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
+import tacos.Allergen;
+import tacos.DietaryTag;
+import tacos.SpiceLevel;
 import tacos.api.dto.IngredientRequest;
 import tacos.api.dto.IngredientResponse;
 import tacos.api.error.ApiExceptionHandler;
@@ -160,6 +164,28 @@ public class IngredientControllerTest {
             i.getName().equals("Pickle") &&
             i.getType() == Ingredient.Type.VEGGIES
         ));
+    }
+
+    @Test
+    public void shouldExposeConfiguredIngredientClassificationMetadata() {
+        IngredientRequest request = request("SLSA", "Hot salsa",
+            Ingredient.Type.SAUCE);
+        request.setDietaryTags(EnumSet.of(DietaryTag.VEGAN,
+            DietaryTag.GLUTEN_FREE));
+        request.setAllergens(EnumSet.of(Allergen.SESAME));
+        request.setSpiceLevel(SpiceLevel.HOT);
+        Mockito.when(repo.save(Mockito.any(Ingredient.class)))
+            .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+
+        testClient.post().uri("/api/ingredients")
+            .bodyValue(request)
+            .exchange()
+            .expectStatus().isCreated()
+            .expectBody()
+                .jsonPath("$.dietaryTags[0]").isEqualTo("VEGAN")
+                .jsonPath("$.dietaryTags[1]").isEqualTo("GLUTEN_FREE")
+                .jsonPath("$.allergens[0]").isEqualTo("SESAME")
+                .jsonPath("$.spiceLevel").isEqualTo("HOT");
     }
 
     @Test

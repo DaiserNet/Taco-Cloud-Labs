@@ -1,5 +1,7 @@
 package tacos.api.dto;
 
+import java.util.Set;
+
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
@@ -8,7 +10,10 @@ import javax.validation.constraints.Size;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import lombok.Data;
+import tacos.Allergen;
+import tacos.DietaryTag;
 import tacos.Ingredient.Type;
+import tacos.SpiceLevel;
 
 @Data
 public class IngredientRequest {
@@ -24,6 +29,10 @@ public class IngredientRequest {
 
   @NotNull(message = "must be provided")
   private Type type;
+
+  private Set<@NotNull DietaryTag> dietaryTags;
+  private Set<@NotNull Allergen> allergens;
+  private SpiceLevel spiceLevel;
 
   @JsonAnySetter
   public void rejectUnknownField(String name, Object value) {

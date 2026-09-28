@@ -1,6 +1,11 @@
 package tacos.web.api;
 
+import java.util.stream.Collectors;
+
+import javax.validation.Valid;
+
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,32 +16,73 @@ import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tacos.Ingredient;
 import tacos.Taco;
+import tacos.api.dto.TacoClassification;
+import tacos.api.dto.TacoCreateRequest;
+import tacos.api.dto.TacoResponse;
+import tacos.api.mapper.IngredientMapper;
+import tacos.classification.TacoClassificationService;
 import tacos.data.TacoRepository;
 
 @RestController
 @RequestMapping(path = "/api/tacos", produces = "application/json")
 public class TacoController {
-  private TacoRepository tacoRepo;
+  private final TacoRepository tacoRepo;
+  private final TacoClassificationService classificationService;
+  private final IngredientMapper ingredientMapper;
 
-  public TacoController(TacoRepository tacoRepo) {
+  public TacoController(TacoRepository tacoRepo,
+      TacoClassificationService classificationService,
+      IngredientMapper ingredientMapper) {
     this.tacoRepo = tacoRepo;
+    this.classificationService = classificationService;
+    this.ingredientMapper = ingredientMapper;
   }
 
   @GetMapping(params="recent")
-  public Flux<Taco> recentTacos() {
-    return tacoRepo.findAll().take(12);
+  public Flux<TacoResponse> recentTacos() {
+    return tacoRepo.findAll().take(12)
+        .concatMap(classificationService::resolveIngredients)
+        .map(this::toResponse);
   }
 
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<Taco> postTaco(@RequestBody Taco taco) {
-    return tacoRepo.save(taco);
+  public Mono<TacoResponse> postTaco(
+      @Valid @RequestBody TacoCreateRequest request) {
+    Taco taco = new Taco();
+    taco.setName(request.getName());
+    taco.setIngredients(request.getIngredients().stream()
+        .map(ingredient -> new Ingredient(ingredient.getId(), null, null))
+        .collect(Collectors.toList()));
+    return classificationService.resolveIngredients(taco)
+        .flatMap(tacoRepo::save)
+        .map(this::toResponse);
   }
 
   @GetMapping("/{id}")
-  public Mono<Taco> tacoById(@PathVariable("id") String id) {
-    return tacoRepo.findById(id);
+  public Mono<TacoResponse> tacoById(@PathVariable("id") String id) {
+    return findResolved(id).map(this::toResponse);
+  }
+
+  @GetMapping("/{id}/classification")
+  public Mono<TacoClassification> classification(@PathVariable("id") String id) {
+    return findResolved(id).map(classificationService::classify);
+  }
+
+  private Mono<Taco> findResolved(String id) {
+    return tacoRepo.findById(id)
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
+        .flatMap(classificationService::resolveIngredients);
+  }
+
+  private TacoResponse toResponse(Taco taco) {
+    return new TacoResponse(taco.getId(), taco.getName(), taco.getCreatedAt(),
+        taco.getIngredients().stream()
+            .map(ingredientMapper::toResponse)
+            .collect(Collectors.toList()),
+        classificationService.classify(taco));
   }
 
 }

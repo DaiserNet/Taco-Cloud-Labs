@@ -2,6 +2,8 @@ package tacos;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Set;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -29,25 +31,43 @@ public class DevelopmentConfig {
       @Override
       public void run(String... args) throws Exception {
         Ingredient flourTortilla = saveAnIngredient(
-            "FLTO", "Flour Tortilla", Type.WRAP, "0.50", 100, 20);
+            "FLTO", "Flour Tortilla", Type.WRAP, "0.50", 100, 20,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN),
+            allergens(Allergen.GLUTEN), SpiceLevel.NONE);
         Ingredient cornTortilla = saveAnIngredient(
-            "COTO", "Corn Tortilla", Type.WRAP, "0.45", 100, 20);
+            "COTO", "Corn Tortilla", Type.WRAP, "0.45", 100, 20,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
+                DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient groundBeef = saveAnIngredient(
-            "GRBF", "Ground Beef", Type.PROTEIN, "1.25", 80, 15);
+            "GRBF", "Ground Beef", Type.PROTEIN, "1.25", 80, 15,
+            tags(DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient carnitas = saveAnIngredient(
-            "CARN", "Carnitas", Type.PROTEIN, "1.35", 80, 15);
+            "CARN", "Carnitas", Type.PROTEIN, "1.35", 80, 15,
+            tags(DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient tomatoes = saveAnIngredient(
-            "TMTO", "Diced Tomatoes", Type.VEGGIES, "0.35", 120, 25);
+            "TMTO", "Diced Tomatoes", Type.VEGGIES, "0.35", 120, 25,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
+                DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient lettuce = saveAnIngredient(
-            "LETC", "Lettuce", Type.VEGGIES, "0.30", 120, 25);
+            "LETC", "Lettuce", Type.VEGGIES, "0.30", 120, 25,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
+                DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.NONE);
         Ingredient cheddar = saveAnIngredient(
-            "CHED", "Cheddar", Type.CHEESE, "0.60", 90, 20);
+            "CHED", "Cheddar", Type.CHEESE, "0.60", 90, 20,
+            tags(DietaryTag.VEGETARIAN, DietaryTag.GLUTEN_FREE),
+            allergens(Allergen.MILK), SpiceLevel.NONE);
         Ingredient jack = saveAnIngredient(
-            "JACK", "Monterrey Jack", Type.CHEESE, "0.65", 90, 20);
+            "JACK", "Monterrey Jack", Type.CHEESE, "0.65", 90, 20,
+            tags(DietaryTag.VEGETARIAN, DietaryTag.GLUTEN_FREE),
+            allergens(Allergen.MILK), SpiceLevel.NONE);
         Ingredient salsa = saveAnIngredient(
-            "SLSA", "Salsa", Type.SAUCE, "0.40", 100, 20);
+            "SLSA", "Salsa", Type.SAUCE, "0.40", 100, 20,
+            tags(DietaryTag.VEGAN, DietaryTag.VEGETARIAN,
+                DietaryTag.GLUTEN_FREE), allergens(), SpiceLevel.MEDIUM);
         Ingredient sourCream = saveAnIngredient(
-            "SRCR", "Sour Cream", Type.SAUCE, "0.50", 100, 20);
+            "SRCR", "Sour Cream", Type.SAUCE, "0.50", 100, 20,
+            tags(DietaryTag.VEGETARIAN, DietaryTag.GLUTEN_FREE),
+            allergens(Allergen.MILK), SpiceLevel.NONE);
         
 //        UserUDT u = new UserUDT(username, fullname, phoneNumber)
         
@@ -103,11 +123,28 @@ public class DevelopmentConfig {
       }
 
       private Ingredient saveAnIngredient(String id, String name, Type type,
-          String unitPrice, int stockOnHand, int reorderLevel) {
+          String unitPrice, int stockOnHand, int reorderLevel,
+          Set<DietaryTag> dietaryTags, Set<Allergen> allergens,
+          SpiceLevel spiceLevel) {
         Ingredient ingredient = new Ingredient(id, name, type,
             new BigDecimal(unitPrice), true, stockOnHand, reorderLevel);
+        ingredient.setDietaryTags(dietaryTags);
+        ingredient.setAllergens(allergens);
+        ingredient.setSpiceLevel(spiceLevel);
         repo.save(ingredient).subscribe();
         return ingredient;
+      }
+
+      private Set<DietaryTag> tags(DietaryTag first, DietaryTag... rest) {
+        Set<DietaryTag> tags = EnumSet.of(first);
+        tags.addAll(Arrays.asList(rest));
+        return tags;
+      }
+
+      private Set<Allergen> allergens(Allergen... values) {
+        Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
+        allergens.addAll(Arrays.asList(values));
+        return allergens;
       }
     };
   }
