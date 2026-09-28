@@ -21,6 +21,8 @@ spring:
   application:
     name: taco-cloud
   data:
+    mongodb:
+      auto-index-creation: true
     rest:
       base-path: /data-api
     cassandra:
@@ -83,6 +85,8 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  taco-search:
+    max-size: 50
   api:
     allowed-origins: ${TACOCLOUD_API_ALLOWED_ORIGINS:http://localhost:8080}
   order-pricing:

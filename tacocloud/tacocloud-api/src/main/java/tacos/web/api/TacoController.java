@@ -7,6 +7,7 @@ import javax.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,10 +22,13 @@ import tacos.api.dto.TacoClassification;
 import tacos.api.dto.TacoCreateRequest;
 import tacos.api.dto.TacoDesignValidationResponse;
 import tacos.api.dto.TacoResponse;
+import tacos.api.dto.TacoSearchRequest;
+import tacos.api.dto.TacoSearchResponse;
 import tacos.api.mapper.IngredientMapper;
 import tacos.classification.TacoClassificationService;
 import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
+import tacos.search.TacoSearchService;
 
 @RestController
 @RequestMapping(path = "/api/tacos", produces = "application/json")
@@ -33,14 +37,28 @@ public class TacoController {
   private final TacoClassificationService classificationService;
   private final IngredientMapper ingredientMapper;
   private final TacoDesignValidator designValidator;
+  private final TacoSearchService searchService;
 
   public TacoController(TacoRepository tacoRepo,
       TacoClassificationService classificationService,
-      IngredientMapper ingredientMapper, TacoDesignValidator designValidator) {
+      IngredientMapper ingredientMapper, TacoDesignValidator designValidator,
+      TacoSearchService searchService) {
     this.tacoRepo = tacoRepo;
     this.classificationService = classificationService;
     this.ingredientMapper = ingredientMapper;
     this.designValidator = designValidator;
+    this.searchService = searchService;
+  }
+
+  @GetMapping
+  public Mono<TacoSearchResponse> searchTacos(
+      @ModelAttribute TacoSearchRequest request) {
+    return searchService.search(request)
+        .map(page -> new TacoSearchResponse(
+            page.getContent().stream().map(this::toResponse)
+                .collect(Collectors.toList()),
+            page.getNumber(), page.getSize(), page.getTotalElements(),
+            page.getTotalPages()));
   }
 
   @GetMapping(params="recent")

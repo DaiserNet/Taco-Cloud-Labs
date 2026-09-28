@@ -65,19 +65,15 @@ public class TacoClassificationService {
         ? SpiceLevel.UNKNOWN : SpiceLevel.NONE;
 
     for (Ingredient ingredient : ingredients) {
-      Set<DietaryTag> tags = ingredient.getDietaryTags() == null
-          ? Collections.emptySet() : ingredient.getDietaryTags();
       Set<Allergen> declaredAllergens = ingredient.getAllergens() == null
           ? Collections.emptySet() : ingredient.getAllergens();
-      vegan &= tags.contains(DietaryTag.VEGAN);
-      vegetarian &= tags.contains(DietaryTag.VEGAN)
-          || tags.contains(DietaryTag.VEGETARIAN);
-      glutenFree &= tags.contains(DietaryTag.GLUTEN_FREE)
-          && !declaredAllergens.contains(Allergen.GLUTEN);
+      vegan &= supportsDiet(ingredient, DietaryTag.VEGAN);
+      vegetarian &= supportsDiet(ingredient, DietaryTag.VEGETARIAN);
+      glutenFree &= supportsDiet(ingredient, DietaryTag.GLUTEN_FREE);
       allergens.addAll(declaredAllergens);
 
-      SpiceLevel level = ingredient.getSpiceLevel();
-      if (level == null || level == SpiceLevel.UNKNOWN) {
+      SpiceLevel level = effectiveSpice(ingredient);
+      if (level == SpiceLevel.UNKNOWN) {
         spice = SpiceLevel.UNKNOWN;
       } else if (spice != SpiceLevel.UNKNOWN
           && level.ordinal() > spice.ordinal()) {
@@ -97,5 +93,29 @@ public class TacoClassificationService {
     }
     return new TacoClassification(
         taco.getId(), resultTags, allergens, spice, DISCLAIMER);
+  }
+
+  public boolean supportsDiet(Ingredient ingredient, DietaryTag tag) {
+    Set<DietaryTag> tags = ingredient.getDietaryTags() == null
+        ? Collections.emptySet() : ingredient.getDietaryTags();
+    Set<Allergen> allergens = ingredient.getAllergens() == null
+        ? Collections.emptySet() : ingredient.getAllergens();
+    switch (tag) {
+      case VEGAN:
+        return tags.contains(DietaryTag.VEGAN);
+      case VEGETARIAN:
+        return tags.contains(DietaryTag.VEGAN)
+            || tags.contains(DietaryTag.VEGETARIAN);
+      case GLUTEN_FREE:
+        return tags.contains(DietaryTag.GLUTEN_FREE)
+            && !allergens.contains(Allergen.GLUTEN);
+      default:
+        return false;
+    }
+  }
+
+  public SpiceLevel effectiveSpice(Ingredient ingredient) {
+    return ingredient.getSpiceLevel() == null
+        ? SpiceLevel.UNKNOWN : ingredient.getSpiceLevel();
   }
 }

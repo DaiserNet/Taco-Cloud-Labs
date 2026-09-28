@@ -15,7 +15,7 @@ export class RecentTacosComponent implements OnInit {
   constructor(private httpClient: HttpClient) { }
 
   ngOnInit() {
-    this.httpClient.get('http://localhost:8080/api/tacos?recent') // <1>
-        .subscribe(data => this.recentTacos = data);
+    this.httpClient.get('/api/tacos?page=0&size=12&sort=createdAt,desc')
+        .subscribe((data: any) => this.recentTacos = data.content);
   }
 }

@@ -18,6 +18,7 @@ import tacos.api.mapper.IngredientMapper;
 import tacos.classification.TacoClassificationService;
 import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
+import tacos.search.TacoSearchService;
 
 @WebMvcTest(TacoController.class)
 @Import(ApiCorsConfiguration.class)
@@ -41,6 +42,9 @@ class ApiCorsConfigurationTest {
 
   @MockBean
   private IngredientMapper ingredientMapper;
+
+  @MockBean
+  private TacoSearchService searchService;
 
   @Test
   void shouldAllowConfiguredOriginForApiPreflight() throws Exception {
