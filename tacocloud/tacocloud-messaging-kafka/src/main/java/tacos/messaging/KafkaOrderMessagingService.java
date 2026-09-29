@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 @Service
 @ConditionalOnProperty(name = "tacocloud.messaging.transport", havingValue = "kafka")
@@ -25,6 +26,12 @@ public class KafkaOrderMessagingService
   @Override
   public void sendOrder(OrderEvent event) {
     kafkaTemplate.send(topic, event);
+  }
+
+  @Override
+  public Mono<Void> publish(OrderEvent event) {
+    return Mono.<Void>create(sink -> kafkaTemplate.send(topic, event)
+        .addCallback(result -> sink.success(), sink::error));
   }
   
 }

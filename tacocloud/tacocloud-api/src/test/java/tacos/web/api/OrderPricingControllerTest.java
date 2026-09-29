@@ -83,7 +83,8 @@ class OrderPricingControllerTest {
     when(inventoryService.accept(any(String.class), any(String.class)))
         .thenReturn(Mono.empty());
     OrderService orderService = new OrderService(orderRepo,
-        mock(EmailOrderService.class), messaging, userRepo,
+        mock(EmailOrderService.class),
+        OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService), userRepo,
         mock(Validator.class), paymentMethodService, pricingService,
         couponService, inventoryService);
     mvc = MockMvcBuilders.standaloneSetup(
@@ -121,7 +122,7 @@ class OrderPricingControllerTest {
     verify(orderRepo).save(savedOrder.capture());
     assertEquals(new BigDecimal("1.45"),
         savedOrder.getValue().getItems().get(0).getUnitPriceAtPurchase());
-    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test

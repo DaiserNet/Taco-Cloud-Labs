@@ -61,6 +61,7 @@ class OrderInventoryControllerTest {
   private CouponService couponService;
   private InventoryService inventoryService;
   private OrderMessagingService messaging;
+  private OrderOutboxService outbox;
   private InventoryReservation reservation;
   private OrderService orderService;
   private MockMvc mvc;
@@ -85,8 +86,10 @@ class OrderInventoryControllerTest {
         .thenReturn(Mono.empty());
     when(inventoryService.release(any(String.class))).thenReturn(Mono.empty());
 
+    outbox = OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService);
     orderService = new OrderService(orderRepo, mock(EmailOrderService.class),
-        messaging, userRepo, mock(Validator.class), paymentMethodService,
+        outbox,
+        userRepo, mock(Validator.class), paymentMethodService,
         pricingService, couponService, inventoryService);
     mvc = MockMvcBuilders.standaloneSetup(
         new OrderApiController(orderService, new OrderMapper()))
@@ -95,7 +98,7 @@ class OrderInventoryControllerTest {
   }
 
   @Test
-  void shouldReserveSaveAcceptAndPublishInOrder() {
+  void shouldReserveSaveAndAcceptWithoutDirectPublishing() {
     TacoOrder order = requestedOrder();
     prepareOwnerAndPayment();
     when(inventoryService.reserve(order)).thenReturn(Mono.just(reservation));
@@ -113,11 +116,11 @@ class OrderInventoryControllerTest {
         })
         .verifyComplete();
 
-    InOrder effects = inOrder(inventoryService, orderRepo, messaging);
+    InOrder effects = inOrder(inventoryService, orderRepo);
     effects.verify(inventoryService).reserve(order);
     effects.verify(orderRepo).save(order);
     effects.verify(inventoryService).accept("RESERVATION-ID", "ORDER-ID");
-    effects.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test
@@ -157,7 +160,22 @@ class OrderInventoryControllerTest {
   }
 
   @Test
-  void shouldDeleteOrderAndReleaseReservationWhenAcceptanceFails() {
+  void shouldReleaseReservationWhenTransactionalOutboxWriteFails() {
+    TacoOrder order = requestedOrder();
+    prepareOwnerAndPayment();
+    when(inventoryService.reserve(order)).thenReturn(Mono.just(reservation));
+    when(outbox.saveAcceptedOrder(order, reservation))
+        .thenReturn(Mono.error(new IllegalStateException("outbox failed")));
+
+    StepVerifier.create(orderService.createOrder(order, user()))
+        .expectErrorMessage("outbox failed").verify();
+
+    verify(inventoryService).release("RESERVATION-ID");
+    verifyNoInteractions(messaging);
+  }
+
+  @Test
+  void shouldReleaseReservationWhenAcceptanceFails() {
     TacoOrder order = requestedOrder();
     prepareOwnerAndPayment();
     when(inventoryService.reserve(order)).thenReturn(Mono.just(reservation));
@@ -167,7 +185,6 @@ class OrderInventoryControllerTest {
     });
     when(inventoryService.accept("RESERVATION-ID", "ORDER-ID"))
         .thenReturn(Mono.error(new IllegalStateException("accept failed")));
-    when(orderRepo.deleteById("ORDER-ID")).thenReturn(Mono.empty());
 
     StepVerifier.create(orderService.createOrder(order, user()))
         .expectErrorMatches(error -> error instanceof IllegalStateException
@@ -179,7 +196,6 @@ class OrderInventoryControllerTest {
     compensation.verify(orderRepo).save(order);
     compensation.verify(inventoryService)
         .accept("RESERVATION-ID", "ORDER-ID");
-    compensation.verify(orderRepo).deleteById("ORDER-ID");
     compensation.verify(inventoryService).release("RESERVATION-ID");
     verifyNoInteractions(messaging);
   }

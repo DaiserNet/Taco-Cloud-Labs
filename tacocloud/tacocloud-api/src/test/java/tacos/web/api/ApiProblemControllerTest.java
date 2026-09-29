@@ -71,7 +71,7 @@ class ApiProblemControllerTest {
     userRepo = mock(UserRepository.class);
     registrationService = mock(RegistrationService.class);
     OrderService orderService = new OrderService(orderRepo, emailOrderService,
-        messaging, userRepo, mock(Validator.class),
+        OrderOutboxTestSupport.commitUsing(orderRepo, mock(InventoryService.class)), userRepo, mock(Validator.class),
         mock(tacos.payment.PaymentMethodService.class),
         mock(OrderPricingService.class), mock(CouponService.class),
         mock(InventoryService.class));

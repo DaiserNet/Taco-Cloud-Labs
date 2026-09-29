@@ -64,7 +64,8 @@ class OrderAuthorizationServiceTest {
         .thenReturn(Mono.just(inventoryReservation));
     when(inventoryService.accept(any(String.class), any(String.class)))
         .thenReturn(Mono.empty());
-    service = new OrderService(orderRepo, emailOrderService, messaging,
+    service = new OrderService(orderRepo, emailOrderService,
+        OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService),
         userRepo, mock(Validator.class), paymentMethodService,
         orderPricingService, couponService, inventoryService);
   }
@@ -93,9 +94,8 @@ class OrderAuthorizationServiceTest {
         })
         .verifyComplete();
 
-    InOrder effects = inOrder(orderRepo, messaging);
-    effects.verify(orderRepo).save(requested);
-    effects.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verify(orderRepo).save(requested);
+    verifyNoInteractions(messaging);
   }
 
   @Test

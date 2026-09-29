@@ -68,6 +68,9 @@ public class OrderApiControllerTest {
     private OrderMessagingService orderMessages;
 
     @MockBean
+    private OrderOutboxService outbox;
+
+    @MockBean
     private EmailOrderService emailOrderService;
 
     @MockBean

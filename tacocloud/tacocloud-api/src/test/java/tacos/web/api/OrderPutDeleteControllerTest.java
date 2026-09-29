@@ -78,7 +78,9 @@ class OrderPutDeleteControllerTest {
         .when(inventoryService.release(any(String.class)))
         .thenReturn(Mono.empty());
     OrderService orderService = new OrderService(
-        repo, emailOrderService, orderMessages, userRepo, validator,
+        repo, emailOrderService,
+        OrderOutboxTestSupport.commitUsing(repo, inventoryService),
+        userRepo, validator,
         org.mockito.Mockito.mock(tacos.payment.PaymentMethodService.class),
         org.mockito.Mockito.mock(OrderPricingService.class),
         org.mockito.Mockito.mock(CouponService.class), inventoryService);

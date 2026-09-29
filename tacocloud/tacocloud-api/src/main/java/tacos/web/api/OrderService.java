@@ -22,7 +22,6 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
-import tacos.messaging.OrderMessagingService;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
@@ -32,7 +31,7 @@ public class OrderService {
 
   private final OrderRepository repo;
   private final EmailOrderService emailOrderService;
-  private final OrderMessagingService orderMessages;
+  private final OrderOutboxService outbox;
   private final UserRepository userRepo;
   private final Validator validator;
   private final PaymentMethodService paymentMethodService;
@@ -41,13 +40,13 @@ public class OrderService {
   private final InventoryService inventoryService;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
-      OrderMessagingService orderMessages, UserRepository userRepo,
+      OrderOutboxService outbox, UserRepository userRepo,
       Validator validator, PaymentMethodService paymentMethodService,
       OrderPricingService orderPricingService, CouponService couponService,
       InventoryService inventoryService) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
-    this.orderMessages = orderMessages;
+    this.outbox = outbox;
     this.userRepo = userRepo;
     this.validator = validator;
     this.paymentMethodService = paymentMethodService;
@@ -84,8 +83,7 @@ public class OrderService {
                         initializeLifecycle(pricedOrder, authentication, origin);
                         return reserveSaveAndAccept(pricedOrder);
                       }));
-                })
-                .flatMap(this::publish)));
+                })));
   }
 
   public Mono<TacoOrder> createFromEmail(
@@ -108,8 +106,7 @@ public class OrderService {
         .flatMap(order -> {
           initializeLifecycle(order, authentication, "EMAIL");
           return reserveSaveAndAccept(order);
-        })
-        .flatMap(this::publish);
+        });
   }
 
   public Mono<TacoOrder> patchOrder(
@@ -161,34 +158,14 @@ public class OrderService {
 
   private Mono<TacoOrder> saveReservedOrder(
       TacoOrder order, InventoryReservation reservation) {
-    return Mono.defer(() -> repo.save(order))
-        .onErrorResume(error -> releaseAndPropagate(reservation, error))
-        .flatMap(savedOrder -> inventoryService
-            .accept(reservation.getId(), savedOrder.getId())
-            .thenReturn(savedOrder)
-            .onErrorResume(error -> compensateUnacceptedOrder(
-                savedOrder, reservation, error)));
-  }
-
-  private Mono<TacoOrder> compensateUnacceptedOrder(
-      TacoOrder order, InventoryReservation reservation, Throwable error) {
-    return Mono.defer(() -> repo.deleteById(order.getId()))
-        .onErrorResume(deleteError -> Mono.defer(() -> inventoryService
-            .release(reservation.getId()))
-            .then(Mono.error(deleteError)))
-        .then(Mono.defer(() -> inventoryService.release(reservation.getId())))
-        .then(Mono.error(error));
+    return outbox.saveAcceptedOrder(order, reservation)
+        .onErrorResume(error -> releaseAndPropagate(reservation, error));
   }
 
   private <T> Mono<T> releaseAndPropagate(
       InventoryReservation reservation, Throwable error) {
     return inventoryService.release(reservation.getId())
         .then(Mono.error(error));
-  }
-
-  private Mono<TacoOrder> publish(TacoOrder order) {
-    return Mono.fromRunnable(() -> orderMessages.sendOrder(OrderEventFactory.created(order)))
-        .thenReturn(order);
   }
 
   private Mono<TacoOrder> findAuthorizedEditable(

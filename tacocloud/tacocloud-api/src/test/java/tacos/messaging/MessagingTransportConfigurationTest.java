@@ -8,13 +8,19 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
 import java.util.Map;
+import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.core.RabbitOperations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.util.concurrent.SettableListenableFuture;
+
+import reactor.test.StepVerifier;
 
 class MessagingTransportConfigurationTest {
   private final JmsTemplate jms = mock(JmsTemplate.class);
@@ -80,6 +86,42 @@ class MessagingTransportConfigurationTest {
           context.getBean(OrderMessagingService.class).sendOrder(event);
           verify(kafka).send("kafka.orders", event);
         });
+  }
+
+  @Test
+  void shouldWaitForKafkaAcknowledgementAndSurfaceFailure() {
+    OrderEvent event = event();
+    SettableListenableFuture<SendResult<String, OrderEvent>> acknowledgement =
+        new SettableListenableFuture<>();
+    org.mockito.Mockito.when(kafka.send("kafka.orders", event))
+        .thenReturn(acknowledgement);
+    KafkaOrderMessagingService adapter =
+        new KafkaOrderMessagingService(kafka, "kafka.orders");
+
+    StepVerifier.create(adapter.publish(event))
+        .expectSubscription()
+        .expectNoEvent(Duration.ofMillis(20))
+        .then(() -> acknowledgement.setException(
+            new IllegalStateException("broker unavailable")))
+        .expectErrorMessage("broker unavailable")
+        .verify();
+  }
+
+  @Test
+  void shouldWaitForRabbitBrokerConfirm() {
+    RabbitOperations operations = mock(RabbitOperations.class);
+    org.mockito.Mockito.when(rabbit.invoke(any())).thenAnswer(call -> {
+      RabbitOperations.OperationsCallback<?> callback = call.getArgument(0);
+      return callback.doInRabbit(operations);
+    });
+    RabbitOrderMessagingService adapter = new RabbitOrderMessagingService(
+        rabbit, "rabbit.orders", 30000);
+
+    StepVerifier.create(adapter.publish(event())).verifyComplete();
+
+    verify(operations).convertAndSend(eq("rabbit.orders"),
+        any(OrderEvent.class), any(MessagePostProcessor.class));
+    verify(operations).waitForConfirmsOrDie(30000);
   }
 
   @Test

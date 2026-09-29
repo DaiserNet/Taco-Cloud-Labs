@@ -79,14 +79,16 @@ class OrderFromEmailControllerTest {
     when(couponService.apply(any(TacoOrder.class)))
         .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
     OrderService orderService = new OrderService(
-        repo, emailOrderService, messaging, userRepo, mock(Validator.class),
+        repo, emailOrderService,
+        OrderOutboxTestSupport.commitUsing(repo, inventoryService),
+        userRepo, mock(Validator.class),
         mock(tacos.payment.PaymentMethodService.class), orderPricingService,
         couponService, inventoryService);
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 
   @Test
-  void shouldSubscribeToColdConversionOnceAndPublishSavedOrderOnce() {
+  void shouldSubscribeToColdConversionOnceAndSaveWithoutDirectPublishing() {
     TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     saved.setId("ORDER-ID");
@@ -104,10 +106,7 @@ class OrderFromEmailControllerTest {
 
     assertEquals(1, conversion.subscribeCount());
     verify(repo, times(1)).save(converted);
-    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
-    InOrder interactions = inOrder(repo, messaging);
-    interactions.verify(repo).save(converted);
-    interactions.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test
@@ -158,27 +157,23 @@ class OrderFromEmailControllerTest {
         .assertNext(order -> assertEquals("ORDER-ID", order.getId()))
         .verifyComplete();
 
-    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test
-  void shouldPropagatePublishFailureInsteadOfCompletingSuccessfully() {
+  void shouldNotContactBrokerDuringOrderCreation() {
     TacoOrder converted = convertedOrder();
     TacoOrder saved = new TacoOrder();
     saved.setId("ORDER-ID");
     when(emailOrderService.convertEmailOrderToDomainOrder(any()))
         .thenReturn(Mono.just(converted));
     when(repo.save(converted)).thenReturn(Mono.just(saved));
-    doThrow(new IllegalStateException("send failed"))
-        .when(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
-
     StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
-        .expectErrorMatches(error -> error instanceof IllegalStateException
-            && "send failed".equals(error.getMessage()))
-        .verify();
+        .expectNextCount(1)
+        .verifyComplete();
 
     verify(repo).save(converted);
-    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test
@@ -202,7 +197,7 @@ class OrderFromEmailControllerTest {
     mvc.perform(asyncDispatch(result))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value("ORDER-ID"));
-    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   private TacoOrder convertedOrder() {

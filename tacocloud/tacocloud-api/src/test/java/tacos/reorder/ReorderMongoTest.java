@@ -73,6 +73,7 @@ import tacos.pricing.CouponValidationException;
 import tacos.pricing.OrderPricingService;
 import tacos.web.api.EmailOrderService;
 import tacos.web.api.OrderService;
+import tacos.web.api.OrderOutboxTestSupport;
 
 @SpringBootTest(classes = ReorderMongoTest.TestApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -132,7 +133,9 @@ class ReorderMongoTest {
         Clock.systemUTC(), "USD");
     InventoryService inventory = new InventoryService(mongo);
     OrderService orders = new OrderService(orderRepo,
-        mock(EmailOrderService.class), messaging, userRepo, validator,
+        mock(EmailOrderService.class),
+        OrderOutboxTestSupport.commitUsing(orderRepo, inventory),
+        userRepo, validator,
         payments, pricing, coupons, inventory);
     OrderHistoryService history = new OrderHistoryService(mongo, userRepo,
         mapper, 50);
@@ -196,7 +199,7 @@ class ReorderMongoTest {
           assertEquals(new BigDecimal("3.50"), result.getOrder().getTotal());
         }).verifyComplete();
     assertCountAndStock(2, 8);
-    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
   }
 
   @Test
@@ -306,7 +309,7 @@ class ReorderMongoTest {
                 == HttpStatus.CONFLICT)
         .verify();
     assertCountAndStock(2, 8);
-    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
+    verifyNoInteractions(messaging);
 
     ReorderRequest invalidCoupon = request(null);
     invalidCoupon.setCouponCode("EXPIRED");
