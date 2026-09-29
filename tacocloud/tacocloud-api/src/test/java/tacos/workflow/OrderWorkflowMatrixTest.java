@@ -44,7 +44,7 @@ class OrderWorkflowMatrixTest {
     boolean delivery = "ROLE_ADMIN".equals(role);
     switch (from) {
       case CREATED:
-        return to == OrderStatus.ACCEPTED && preparation;
+        return to == OrderStatus.ACCEPTED && "ROLE_KITCHEN".equals(role);
       case ACCEPTED:
         return to == OrderStatus.PREPARING && preparation;
       case PREPARING:

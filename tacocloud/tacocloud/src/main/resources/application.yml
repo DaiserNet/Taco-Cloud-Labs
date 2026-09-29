@@ -85,6 +85,12 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  kitchen:
+    eta:
+      base-minutes: 4
+      per-queued-order-minutes: 3
+      per-unit-minutes: 2
+      per-extra-ingredient-minutes: 1
   order-history:
     max-page-size: 50
   taco-of-day:

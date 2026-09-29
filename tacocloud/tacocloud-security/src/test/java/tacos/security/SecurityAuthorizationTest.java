@@ -162,9 +162,11 @@ class SecurityAuthorizationTest {
   @Test
   @WithMockUser(roles = "KITCHEN")
   void shouldAllowKitchenStatusWithCsrfButNotCancellation() throws Exception {
-    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
+    mvc.perform(patch("/api/kitchen/orders/OWN/status").with(csrf()))
         .andExpect(status().isOk());
-    mvc.perform(patch("/api/orders/OWN/status"))
+    mvc.perform(patch("/api/kitchen/orders/OWN/status"))
+        .andExpect(status().isForbidden());
+    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
         .andExpect(status().isForbidden());
     mvc.perform(post("/api/orders/OWN/cancel").with(csrf()))
         .andExpect(status().isForbidden());
@@ -184,7 +186,9 @@ class SecurityAuthorizationTest {
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
     mvc.perform(post("/api/tacos").with(csrf())).andExpect(status().isForbidden());
-    mvc.perform(post("/api/kitchen/queue").with(csrf())).andExpect(status().isForbidden());
+    mvc.perform(get("/api/kitchen/queue")).andExpect(status().isForbidden());
+    mvc.perform(post("/api/kitchen/claim").with(csrf()))
+        .andExpect(status().isForbidden());
     mvc.perform(patch("/api/admin/ingredients/FLTO/catalog").with(csrf()))
         .andExpect(status().isForbidden());
     mvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments").with(csrf()))
@@ -231,7 +235,12 @@ class SecurityAuthorizationTest {
   @Test
   @WithMockUser(roles = "KITCHEN")
   void shouldAllowKitchenQueueWithoutIngredientAdministration() throws Exception {
-    mvc.perform(post("/api/kitchen/queue").with(csrf())).andExpect(status().isOk());
+    mvc.perform(get("/api/kitchen/queue")).andExpect(status().isOk());
+    mvc.perform(get("/api/kitchen/ui")).andExpect(status().isOk());
+    mvc.perform(post("/api/kitchen/claim").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/kitchen/claim"))
+        .andExpect(status().isForbidden());
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
   }
 
@@ -262,13 +271,14 @@ class SecurityAuthorizationTest {
         "/api/ingredients/probe", "/api/orders", "/api/orders/me",
         "/api/orders/me/OWN", "/api/orders/OTHER",
         "/api/admin/orders", "/api/admin/orders/ANY",
+        "/api/kitchen/queue", "/api/kitchen/ui",
         "/api/users/me/favorites", "/api/users/bob/favorites",
         "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
     String read() {
       return "ok";
     }
 
-    @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
+    @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/claim",
         "/api/tacos/validate", "/api/tacos",
         "/api/orders/me/OWN/reorder/quote", "/api/orders/me/OWN/reorder",
         "/api/orders/OWN/cancel",
@@ -285,6 +295,11 @@ class SecurityAuthorizationTest {
 
     @PatchMapping("/api/orders/OWN/status")
     String patchOrderStatus() {
+      return "ok";
+    }
+
+    @PatchMapping("/api/kitchen/orders/OWN/status")
+    String patchKitchenStatus() {
       return "ok";
     }
 

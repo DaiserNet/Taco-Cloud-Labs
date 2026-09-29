@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taco Cloud · Cocina</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    button { padding: .55rem .8rem; margin: .25rem; cursor: pointer; }
+    article { border: 1px solid #bbb; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+    #message { min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Cola de cocina</h1>
+  <p>Las estimaciones son orientativas. La siguiente orden se reclama en orden de llegada.</p>
+  <button id="refresh" type="button">Actualizar cola</button>
+  <button id="claim" type="button">Reclamar siguiente</button>
+  <p id="message" role="status"></p>
+  <h2>Orden asignada</h2>
+  <div id="assigned"></div>
+  <h2>Pendientes</h2>
+  <div id="queue"></div>
+  <script>
+    const message = document.getElementById('message');
+    const assigned = document.getElementById('assigned');
+    const pending = document.getElementById('queue');
+    let current = null;
+
+    function csrfToken() {
+      const entry = document.cookie.split('; ').find(value => value.startsWith('XSRF-TOKEN='));
+      return entry ? decodeURIComponent(entry.substring('XSRF-TOKEN='.length)) : '';
+    }
+
+    async function request(url, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (options.method && options.method !== 'GET') {
+        headers['X-XSRF-TOKEN'] = csrfToken();
+      }
+      const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+      if (!response.ok) {
+        throw new Error(`La operación respondió HTTP ${response.status}`);
+      }
+      return response.status === 204 ? null : response.json();
+    }
+
+    function orderCard(order) {
+      const card = document.createElement('article');
+      const title = document.createElement('strong');
+      title.textContent = `Orden ${order.id} · ${order.status}`;
+      card.appendChild(title);
+      const eta = document.createElement('p');
+      eta.textContent = `Tiempo estimado: ${order.estimatedPrepMinutes} minutos`;
+      card.appendChild(eta);
+      for (const item of order.items) {
+        const line = document.createElement('p');
+        line.textContent = `${item.quantity} × ${item.tacoName} (${item.ingredientNames.join(', ')})`;
+        card.appendChild(line);
+      }
+      return card;
+    }
+
+    function showAssigned() {
+      assigned.replaceChildren();
+      if (!current) return;
+      const card = orderCard(current);
+      if (current.status === 'ACCEPTED' || current.status === 'PREPARING') {
+        const next = current.status === 'ACCEPTED' ? 'PREPARING' : 'READY';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `Marcar ${next}`;
+        button.addEventListener('click', () => advance(next));
+        card.appendChild(button);
+      }
+      assigned.appendChild(card);
+    }
+
+    async function refresh() {
+      try {
+        const orders = await request('/api/kitchen/queue');
+        pending.replaceChildren(...orders.map(orderCard));
+        message.textContent = `${orders.length} órdenes pendientes`;
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    async function claim() {
+      try {
+        const order = await request('/api/kitchen/claim', { method: 'POST' });
+        if (order) {
+          current = order;
+          showAssigned();
+          message.textContent = `Orden ${order.id} asignada`;
+        } else {
+          message.textContent = 'La cola está vacía';
+        }
+        await refresh();
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    async function advance(status) {
+      try {
+        current = await request(`/api/kitchen/orders/${encodeURIComponent(current.id)}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, expectedVersion: current.version,
+            reason: status === 'PREPARING' ? 'Preparation started' : 'Ready for delivery' })
+        });
+        showAssigned();
+        message.textContent = `Orden ${current.id}: ${current.status}`;
+        await refresh();
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', refresh);
+    document.getElementById('claim').addEventListener('click', claim);
+    refresh();
+  </script>
+</body>
+</html>

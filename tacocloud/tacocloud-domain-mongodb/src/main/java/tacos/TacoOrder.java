@@ -10,6 +10,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -24,7 +25,9 @@ import lombok.Data;
     @CompoundIndex(name = "order_placed_id",
         def = "{'placedAt': -1, '_id': 1}"),
     @CompoundIndex(name = "order_status_placed_id",
-        def = "{'status': 1, 'placedAt': -1, '_id': 1}")
+        def = "{'status': 1, 'placedAt': -1, '_id': 1}"),
+    @CompoundIndex(name = "order_kitchen_fifo",
+        def = "{'status': 1, 'placedAt': 1, '_id': 1}")
 })
 public class TacoOrder implements Serializable {
   private static final long serialVersionUID = 1L;
@@ -38,6 +41,13 @@ public class TacoOrder implements Serializable {
   private User user;
 
   private OrderStatus status = OrderStatus.CREATED;
+
+  private String stationId;
+  private String cookId;
+
+  @Indexed(name = "order_active_station_unique", unique = true,
+      partialFilter = "{ 'activeStationId': { '$type': 'string' } }")
+  private String activeStationId;
 
   @JsonIgnore
   private List<OrderStatusChange> statusHistory = new ArrayList<>();

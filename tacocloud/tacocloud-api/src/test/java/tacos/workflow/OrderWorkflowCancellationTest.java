@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 
@@ -23,7 +24,8 @@ class OrderWorkflowCancellationTest {
   void shouldRetryInventoryReleaseWithoutSecondStatusChange() {
     OrderRepository orders = mock(OrderRepository.class);
     InventoryService inventory = mock(InventoryService.class);
-    OrderWorkflowService workflow = new OrderWorkflowService(orders, inventory);
+    OrderWorkflowService workflow = new OrderWorkflowService(orders, inventory,
+        mock(ReactiveMongoTemplate.class));
     User owner = new User("alice", "encoded", "Alice", "Street", "City",
         "ST", "12345", "5551234", "alice@example.com");
     TacoOrder order = new TacoOrder();

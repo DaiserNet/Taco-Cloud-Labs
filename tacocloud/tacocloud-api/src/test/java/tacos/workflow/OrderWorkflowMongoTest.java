@@ -90,8 +90,7 @@ class OrderWorkflowMongoTest {
     assertStatus(workflow.changeStatus("O1", OrderStatus.DELIVERED,
         0L, "customer", customer("alice")), HttpStatus.FORBIDDEN);
 
-    StepVerifier.create(workflow.changeStatus("O1", OrderStatus.ACCEPTED,
-        0L, "Kitchen accepted", kitchen()))
+    StepVerifier.create(workflow.claimNext(kitchen()))
         .assertNext(saved -> assertEquals(1L, saved.getVersion()))
         .verifyComplete();
     StepVerifier.create(workflow.changeStatus("O1", OrderStatus.PREPARING,
@@ -166,8 +165,7 @@ class OrderWorkflowMongoTest {
           second.set(pair.getT2());
         }).verifyComplete();
 
-    StepVerifier.create(workflow.changeStatus("O3", OrderStatus.ACCEPTED,
-        0L, "accepted", kitchen()))
+    StepVerifier.create(workflow.claimNext(kitchen()))
         .assertNext(saved -> assertEquals(1L, saved.getVersion()))
         .verifyComplete();
     assertStatus(workflow.changeStatus("O3", OrderStatus.PREPARING,

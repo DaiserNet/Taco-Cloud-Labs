@@ -10,9 +10,10 @@ import tacos.TacoOrder;
 public class KitchenUI {
 
   public void displayOrder(TacoOrder order) {
-    // TODO: Beef this up to do more than just log the received taco.
-    //       To display it in some sort of UI.
-    log.info("RECEIVED ORDER:  " + order);
+    int tacos = order == null || order.getTacos() == null
+        ? 0 : order.getTacos().size();
+    log.info("Kitchen notification received for {} tacos. Use the protected "
+        + "Taco Cloud API queue at /api/kitchen/ui for claim and progress.", tacos);
   }
   
 }

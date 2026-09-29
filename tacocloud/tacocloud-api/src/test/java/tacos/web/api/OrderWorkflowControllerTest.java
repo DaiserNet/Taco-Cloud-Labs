@@ -66,7 +66,7 @@ class OrderWorkflowControllerTest {
 
     perform(patch("/api/orders/O1/status")
         .content("{\"status\":\"ACCEPTED\",\"expectedVersion\":0,"
-            + "\"reason\":\"Kitchen accepted\"}"), kitchen())
+            + "\"reason\":\"Kitchen accepted\"}"), admin())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("ACCEPTED"))
         .andExpect(jsonPath("$.version").value(1))
@@ -98,7 +98,7 @@ class OrderWorkflowControllerTest {
   @Test
   void shouldRejectClientOwnedFieldsAndMissingVersion() throws Exception {
     mvc.perform(patch("/api/orders/O1/status")
-        .principal(kitchen()).contentType(MediaType.APPLICATION_JSON)
+        .principal(admin()).contentType(MediaType.APPLICATION_JSON)
         .content("{\"status\":\"READY\",\"reason\":\"done\","
             + "\"userId\":\"other\"}"))
         .andExpect(status().isBadRequest());
@@ -118,7 +118,7 @@ class OrderWorkflowControllerTest {
 
     perform(patch("/api/orders/O1/status")
         .content("{\"status\":\"ACCEPTED\",\"expectedVersion\":0,"
-            + "\"reason\":\"accepted\"}"), kitchen())
+            + "\"reason\":\"accepted\"}"), admin())
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("ORDER_VERSION_CONFLICT"));
   }
@@ -150,8 +150,8 @@ class OrderWorkflowControllerTest {
     return auth("alice", "ROLE_USER");
   }
 
-  private Authentication kitchen() {
-    return auth("cook", "ROLE_KITCHEN");
+  private Authentication admin() {
+    return auth("admin", "ROLE_ADMIN");
   }
 
   private Authentication auth(String name, String role) {
