@@ -21,7 +21,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.server.ResponseStatusException;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.PaymentMethod;
@@ -68,34 +67,6 @@ class OrderAuthorizationServiceTest {
     service = new OrderService(orderRepo, emailOrderService, messaging,
         userRepo, mock(Validator.class), paymentMethodService,
         orderPricingService, couponService, inventoryService);
-  }
-
-  @Test
-  void shouldListOnlyAuthenticatedUsersOrders() {
-    TacoOrder own = order("OWN", "alice");
-    when(orderRepo.findByUserUsernameOrderByPlacedAtDesc("alice"))
-        .thenReturn(Flux.just(own));
-
-    StepVerifier.create(service.findVisibleOrders(user("alice")))
-        .expectNext(own)
-        .verifyComplete();
-
-    verify(orderRepo).findByUserUsernameOrderByPlacedAtDesc("alice");
-    verify(orderRepo, never()).findAll();
-  }
-
-  @Test
-  void shouldAllowAdminToAuditAllOrders() {
-    TacoOrder first = order("ONE", "alice");
-    TacoOrder second = order("TWO", "bob");
-    when(orderRepo.findAll()).thenReturn(Flux.just(first, second));
-
-    StepVerifier.create(service.findVisibleOrders(admin("auditor")))
-        .expectNext(first, second)
-        .verifyComplete();
-
-    verify(orderRepo).findAll();
-    verify(orderRepo, never()).findByUserUsernameOrderByPlacedAtDesc(any());
   }
 
   @Test

@@ -7,6 +7,8 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -15,6 +17,14 @@ import lombok.Data;
 
 @Data
 @Document
+@CompoundIndexes({
+    @CompoundIndex(name = "order_owner_placed_id",
+        def = "{'user._id': 1, 'placedAt': -1, '_id': 1}"),
+    @CompoundIndex(name = "order_placed_id",
+        def = "{'placedAt': -1, '_id': 1}"),
+    @CompoundIndex(name = "order_status_placed_id",
+        def = "{'status': 1, 'placedAt': -1, '_id': 1}")
+})
 public class TacoOrder implements Serializable {
   private static final long serialVersionUID = 1L;
 

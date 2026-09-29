@@ -96,7 +96,7 @@ class UiSecuritySmokeTest {
         .andExpect(request().asyncStarted()).andReturn();
     mvc.perform(asyncDispatch(catalog)).andExpect(status().isOk());
 
-    MvcResult orders = mvc.perform(get("/api/orders")
+    MvcResult orders = mvc.perform(get("/api/orders/me")
             .header(HttpHeaders.AUTHORIZATION, basicHabuma()))
         .andExpect(request().asyncStarted()).andReturn();
     mvc.perform(asyncDispatch(orders)).andExpect(status().isOk());

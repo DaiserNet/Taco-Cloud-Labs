@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
@@ -33,12 +31,6 @@ public class OrderApiController {
   public OrderApiController(OrderService orderService, OrderMapper orderMapper) {
     this.orderService = orderService;
     this.orderMapper = orderMapper;
-  }
-
-  @GetMapping(produces = "application/json")
-  public Flux<OrderResponse> allOrders(Authentication authentication) {
-    return orderService.findVisibleOrders(authentication)
-        .map(orderMapper::toResponse);
   }
 
   @PostMapping(consumes = "application/json")

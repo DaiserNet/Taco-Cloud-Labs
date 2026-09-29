@@ -11,7 +11,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.OrderStatus;
 import tacos.TacoOrder;
@@ -52,21 +51,6 @@ public class OrderService {
     this.orderPricingService = orderPricingService;
     this.couponService = couponService;
     this.inventoryService = inventoryService;
-  }
-
-  public Flux<TacoOrder> findVisibleOrders(Authentication authentication) {
-    return Flux.defer(() -> {
-      if (!isAuthenticated(authentication)) {
-        return Flux.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-      }
-      if (hasRole(authentication, "ROLE_ADMIN")) {
-        return repo.findAll();
-      }
-      if (hasRole(authentication, "ROLE_USER")) {
-        return repo.findByUserUsernameOrderByPlacedAtDesc(authentication.getName());
-      }
-      return Flux.error(new ResponseStatusException(HttpStatus.FORBIDDEN));
-    });
   }
 
   public Mono<TacoOrder> createOrder(

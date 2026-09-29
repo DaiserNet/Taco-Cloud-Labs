@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import tacos.Ingredient;
 import tacos.Allergen;
 import tacos.DietaryTag;
@@ -37,17 +37,21 @@ import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
+import tacos.history.OrderHistoryService;
 
 class ApiDtoContractTest {
 
   private OrderService orderService;
+  private OrderHistoryService historyService;
   private WebTestClient client;
 
   @BeforeEach
   void setUp() {
     orderService = mock(OrderService.class);
+    historyService = mock(OrderHistoryService.class);
     OrderApiController controller = new OrderApiController(orderService, new OrderMapper());
-    client = WebTestClient.bindToController(controller).build();
+    client = WebTestClient.bindToController(controller,
+        new OrderHistoryController(historyService)).build();
   }
 
   @Test
@@ -61,21 +65,23 @@ class ApiDtoContractTest {
     order.setPaymentMethodId("PAYMENT-ID");
     order.setPaymentBrand("VISA");
     order.setPaymentLast4("1111");
-    when(orderService.findVisibleOrders(null)).thenReturn(Flux.just(order));
+    when(historyService.myOrder("ORDER-ID", null))
+        .thenReturn(Mono.just(new OrderMapper().toResponse(order)));
 
-    client.get().uri("/api/orders").exchange()
+    client.get().uri("/api/orders/me/ORDER-ID").exchange()
         .expectStatus().isOk()
         .expectBody()
-        .jsonPath("$[0].id").isEqualTo("ORDER-ID")
-        .jsonPath("$[0].userId").isEqualTo("USER-ID")
-        .jsonPath("$[0].paymentBrand").isEqualTo("VISA")
-        .jsonPath("$[0].paymentLast4").isEqualTo("1111")
-        .jsonPath("$[0].user").doesNotExist()
-        .jsonPath("$[0].password").doesNotExist()
-        .jsonPath("$[0].authorities").doesNotExist()
-        .jsonPath("$[0].ccNumber").doesNotExist()
-        .jsonPath("$[0].ccExpiration").doesNotExist()
-        .jsonPath("$[0].ccCVV").doesNotExist();
+        .jsonPath("$.id").isEqualTo("ORDER-ID")
+        .jsonPath("$.userId").isEqualTo("USER-ID")
+        .jsonPath("$.paymentBrand").isEqualTo("VISA")
+        .jsonPath("$.paymentLast4").isEqualTo("1111")
+        .jsonPath("$.user").doesNotExist()
+        .jsonPath("$.password").doesNotExist()
+        .jsonPath("$.authorities").doesNotExist()
+        .jsonPath("$.paymentMethodId").doesNotExist()
+        .jsonPath("$.ccNumber").doesNotExist()
+        .jsonPath("$.ccExpiration").doesNotExist()
+        .jsonPath("$.ccCVV").doesNotExist();
   }
 
   @Test

@@ -10,9 +10,6 @@ import tacos.User;
 public interface OrderRepository 
          extends ReactiveCrudRepository<TacoOrder, String> {
 
-  Flux<TacoOrder> findByUserOrderByPlacedAtDesc(
-          User user, Pageable pageable);
-
-  Flux<TacoOrder> findByUserUsernameOrderByPlacedAtDesc(String username);
+  Flux<TacoOrder> findByUserOrderByPlacedAtDesc(User user, Pageable pageable);
 
 }

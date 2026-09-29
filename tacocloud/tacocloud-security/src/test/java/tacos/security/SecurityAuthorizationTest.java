@@ -56,7 +56,8 @@ class SecurityAuthorizationTest {
   @Test
   @WithMockUser(roles = "USER")
   void shouldAllowUserOrderAccess() throws Exception {
-    mvc.perform(get("/api/orders")).andExpect(status().isOk());
+    mvc.perform(get("/api/orders/me")).andExpect(status().isOk());
+    mvc.perform(get("/api/orders/me/OWN")).andExpect(status().isOk());
     mvc.perform(post("/api/orders").with(csrf())).andExpect(status().isOk());
     mvc.perform(post("/api/payment-methods/tokenize").with(csrf()))
         .andExpect(status().isOk());
@@ -142,7 +143,22 @@ class SecurityAuthorizationTest {
         .andExpect(status().isOk());
     mvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments").with(csrf()))
         .andExpect(status().isOk());
-    mvc.perform(get("/api/orders")).andExpect(status().isOk());
+    mvc.perform(get("/api/admin/orders")).andExpect(status().isOk());
+    mvc.perform(get("/api/admin/orders/ANY")).andExpect(status().isOk());
+  }
+
+  @Test
+  @WithMockUser(roles = "USER")
+  void shouldKeepOrderHistoryPrivateAndRetireGlobalList() throws Exception {
+    mvc.perform(get("/api/admin/orders")).andExpect(status().isForbidden());
+    mvc.perform(get("/api/orders")).andExpect(status().isForbidden());
+    mvc.perform(get("/api/orders/OTHER")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  void shouldRequireAuthenticationForOrderHistory() throws Exception {
+    mvc.perform(get("/api/orders/me")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/admin/orders")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -185,7 +201,9 @@ class SecurityAuthorizationTest {
 
     @GetMapping({"/api/tacos/probe", "/api/tacos/top",
         "/api/tacos/TACO1/classification",
-        "/api/ingredients/probe", "/api/orders",
+        "/api/ingredients/probe", "/api/orders", "/api/orders/me",
+        "/api/orders/me/OWN", "/api/orders/OTHER",
+        "/api/admin/orders", "/api/admin/orders/ANY",
         "/api/users/me/favorites", "/api/users/bob/favorites",
         "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
     String read() {

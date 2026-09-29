@@ -12,6 +12,7 @@ import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderResponse;
+import tacos.api.dto.OrderSummaryResponse;
 
 @Component
 public class OrderMapper {
@@ -53,6 +54,11 @@ public class OrderMapper {
         .map(this::toResponseLine)
         .collect(Collectors.toList()));
     return response;
+  }
+
+  public OrderSummaryResponse toSummary(TacoOrder order) {
+    return new OrderSummaryResponse(order.getId(), order.getPlacedAt(),
+        order.getStatus(), order.getTotal(), order.getCurrency());
   }
 
   private OrderLine toEntityLine(OrderCreateRequest.OrderItem request) {

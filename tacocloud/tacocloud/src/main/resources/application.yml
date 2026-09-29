@@ -85,6 +85,8 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  order-history:
+    max-page-size: 50
   taco-of-day:
     zone: UTC
   favorites:
