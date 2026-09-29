@@ -1,6 +1,12 @@
 package tacos;
 
 public enum OrderStatus {
+  CREATED,
+  ACCEPTED,
   PLACED,
-  PREPARING
+  PREPARING,
+  READY,
+  OUT_FOR_DELIVERY,
+  DELIVERED,
+  CANCELLED
 }

@@ -229,6 +229,37 @@ class OrderPutDeleteControllerTest {
   }
 
   @Test
+  void shouldRequireCancellationInsteadOfDeletingCreatedOrder() {
+    TacoOrder created = editableOrder("NEW", owner());
+    created.setStatus(OrderStatus.CREATED);
+    when(repo.findById("NEW")).thenReturn(Mono.just(created));
+
+    StepVerifier.create(controller.deleteOrder("NEW",
+        userAuthentication("habuma")))
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.CONFLICT))
+        .verify();
+
+    verify(repo, never()).deleteById(any(String.class));
+    verify(inventoryService, never()).release(any(String.class));
+  }
+
+  @Test
+  void shouldRejectAddressPatchAfterKitchenAcceptance() {
+    TacoOrder accepted = editableOrder("ACCEPTED", owner());
+    accepted.setStatus(OrderStatus.ACCEPTED);
+    when(repo.findById("ACCEPTED")).thenReturn(Mono.just(accepted));
+    OrderPatchRequest patch = new OrderPatchRequest();
+    patch.setDeliveryCity("Another city");
+
+    StepVerifier.create(controller.patchOrder("ACCEPTED", patch,
+        userAuthentication("habuma")))
+        .expectErrorMatches(error -> hasStatus(error, HttpStatus.CONFLICT))
+        .verify();
+
+    verify(repo, never()).save(any(TacoOrder.class));
+  }
+
+  @Test
   void shouldAllowAdminToDeleteAnotherUsersOrder() {
     TacoOrder existing = editableOrder("ORDER1", owner());
     when(repo.findById("ORDER1")).thenReturn(Mono.just(existing));

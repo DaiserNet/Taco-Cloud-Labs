@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -30,11 +31,16 @@ public class TacoOrder implements Serializable {
 
   @Id
   private String id;
+  @Version
+  private Long version;
   private Date placedAt = new Date();
 
   private User user;
 
-  private OrderStatus status = OrderStatus.PLACED;
+  private OrderStatus status = OrderStatus.CREATED;
+
+  @JsonIgnore
+  private List<OrderStatusChange> statusHistory = new ArrayList<>();
 
   private String deliveryName;
 

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import tacos.Ingredient;
 import tacos.OrderLine;
+import tacos.OrderStatusChange;
 import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
@@ -37,6 +38,9 @@ public class OrderMapper {
     response.setId(order.getId());
     response.setPlacedAt(order.getPlacedAt());
     response.setStatus(order.getStatus());
+    response.setVersion(order.getVersion());
+    response.setStatusHistory(safe(order.getStatusHistory()).stream()
+        .map(this::toStatusChange).collect(Collectors.toList()));
     response.setUserId(order.getUser() == null ? null : order.getUser().getId());
     response.setDeliveryName(order.getDeliveryName());
     response.setDeliveryStreet(order.getDeliveryStreet());
@@ -117,6 +121,18 @@ public class OrderMapper {
     response.setQuantity(line.getQuantity());
     response.setUnitPriceAtPurchase(line.getUnitPriceAtPurchase());
     response.setSubtotal(line.getSubtotal());
+    return response;
+  }
+
+  private OrderResponse.StatusChange toStatusChange(OrderStatusChange change) {
+    OrderResponse.StatusChange response = new OrderResponse.StatusChange();
+    response.setFrom(change.getFrom());
+    response.setTo(change.getTo());
+    response.setActorId(change.getActorId());
+    response.setActorRole(change.getActorRole());
+    response.setChangedAt(change.getChangedAt());
+    response.setOrigin(change.getOrigin());
+    response.setReason(change.getReason());
     return response;
   }
 

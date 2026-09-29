@@ -99,6 +99,9 @@ class OrderFromEmailControllerTest {
         .assertNext(order -> assertEquals("ORDER-ID", order.getId()))
         .verifyComplete();
 
+    assertEquals(tacos.OrderStatus.CREATED, converted.getStatus());
+    assertEquals("EMAIL", converted.getStatusHistory().get(0).getOrigin());
+
     assertEquals(1, conversion.subscribeCount());
     verify(repo, times(1)).save(converted);
     verify(messaging, times(1)).sendOrder(saved);

@@ -141,6 +141,45 @@ class SecurityAuthorizationTest {
   }
 
   @Test
+  void shouldRequireAuthenticationForOrderWorkflow() throws Exception {
+    mvc.perform(post("/api/orders/OWN/cancel").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @WithMockUser(roles = "USER")
+  void shouldAllowOwnerCancellationButNotOperationalStatus() throws Exception {
+    mvc.perform(post("/api/orders/OWN/cancel").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/orders/OWN/cancel"))
+        .andExpect(status().isForbidden());
+    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "KITCHEN")
+  void shouldAllowKitchenStatusWithCsrfButNotCancellation() throws Exception {
+    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(patch("/api/orders/OWN/status"))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/orders/OWN/cancel").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void shouldAllowAdminStatusWithoutGivingOwnerCancellation() throws Exception {
+    mvc.perform(patch("/api/orders/OWN/status").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/orders/OWN/cancel").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   @WithMockUser(roles = "USER")
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
@@ -232,6 +271,7 @@ class SecurityAuthorizationTest {
     @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
         "/api/tacos/validate", "/api/tacos",
         "/api/orders/me/OWN/reorder/quote", "/api/orders/me/OWN/reorder",
+        "/api/orders/OWN/cancel",
         "/api/payment-methods/tokenize",
         "/api/admin/ingredients/FLTO/stock-adjustments"})
     String write() {
@@ -240,6 +280,11 @@ class SecurityAuthorizationTest {
 
     @PatchMapping("/api/admin/ingredients/FLTO/catalog")
     String patchCatalog() {
+      return "ok";
+    }
+
+    @PatchMapping("/api/orders/OWN/status")
+    String patchOrderStatus() {
       return "ok";
     }
 

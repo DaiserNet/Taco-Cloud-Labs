@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolationException;
 
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -188,6 +189,14 @@ public class ApiExceptionHandler {
     return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
         "An internal data access error occurred.", "DATA_ACCESS_ERROR",
         Collections.emptyList(), request);
+  }
+
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  public ResponseEntity<ApiProblem> handleOrderVersionConflict(
+      OptimisticLockingFailureException error, HttpServletRequest request) {
+    return problem(HttpStatus.CONFLICT, "Order version conflict",
+        "The order changed during this request.",
+        "ORDER_VERSION_CONFLICT", Collections.emptyList(), request);
   }
 
   @ExceptionHandler(Exception.class)

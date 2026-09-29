@@ -1,5 +1,6 @@
 package tacos.web.api;
 
+import java.util.Date;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Mono;
 import tacos.OrderStatus;
+import tacos.OrderStatusChange;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.data.OrderRepository;
@@ -62,6 +64,12 @@ public class OrderService {
   public Mono<TacoOrder> createOrder(TacoOrder order,
       Authentication authentication,
       Function<TacoOrder, Mono<Void>> beforeReservation) {
+    return createOrder(order, authentication, beforeReservation, "HTTP_API");
+  }
+
+  public Mono<TacoOrder> createOrder(TacoOrder order,
+      Authentication authentication,
+      Function<TacoOrder, Mono<Void>> beforeReservation, String origin) {
     return currentUser(authentication)
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
@@ -72,7 +80,10 @@ public class OrderService {
                   pricedOrder.setPaymentBrand(payment.getBrand());
                   pricedOrder.setPaymentLast4(payment.getLast4());
                   return Mono.defer(() -> beforeReservation.apply(pricedOrder))
-                      .then(Mono.defer(() -> reserveSaveAndAccept(pricedOrder)));
+                      .then(Mono.defer(() -> {
+                        initializeLifecycle(pricedOrder, authentication, origin);
+                        return reserveSaveAndAccept(pricedOrder);
+                      }));
                 })
                 .flatMap(this::publish)));
   }
@@ -94,13 +105,16 @@ public class OrderService {
             : Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)))
         .flatMap(orderPricingService::price)
         .flatMap(couponService::apply)
-        .flatMap(this::reserveSaveAndAccept)
+        .flatMap(order -> {
+          initializeLifecycle(order, authentication, "EMAIL");
+          return reserveSaveAndAccept(order);
+        })
         .flatMap(this::publish);
   }
 
   public Mono<TacoOrder> patchOrder(
       String orderId, OrderPatchRequest patch, Authentication authentication) {
-    return findAuthorized(orderId, authentication)
+    return findAuthorizedEditable(orderId, authentication)
         .flatMap(order -> {
           patch.applyTo(order);
           Set<ConstraintViolation<TacoOrder>> violations = validator.validate(order);
@@ -122,10 +136,22 @@ public class OrderService {
   }
 
   public Mono<Void> deleteOrder(String orderId, Authentication authentication) {
-    return findAuthorizedEditable(orderId, authentication)
-        .flatMap(order -> inventoryService
-            .release(order.getInventoryReservationId())
-            .then(repo.deleteById(orderId)));
+    return findAuthorized(orderId, authentication)
+        .flatMap(order -> order.getStatus() == OrderStatus.PLACED
+            ? inventoryService.release(order.getInventoryReservationId())
+                .then(repo.deleteById(orderId))
+            : Mono.error(new ResponseStatusException(HttpStatus.CONFLICT)));
+  }
+
+  private void initializeLifecycle(TacoOrder order,
+      Authentication authentication, String origin) {
+    order.setStatus(OrderStatus.CREATED);
+    order.setStatusHistory(java.util.Collections.singletonList(
+        new OrderStatusChange(null, OrderStatus.CREATED,
+            authentication.getName(),
+            hasRole(authentication, "ROLE_ADMIN") ? "ROLE_ADMIN" : "ROLE_USER",
+            new Date(), origin,
+            "Order created")));
   }
 
   private Mono<TacoOrder> reserveSaveAndAccept(TacoOrder order) {
@@ -226,6 +252,7 @@ public class OrderService {
   }
 
   private boolean isEditable(TacoOrder order) {
-    return order.getStatus() == null || order.getStatus() == OrderStatus.PLACED;
+    return order.getStatus() == OrderStatus.CREATED
+        || order.getStatus() == OrderStatus.PLACED;
   }
 }

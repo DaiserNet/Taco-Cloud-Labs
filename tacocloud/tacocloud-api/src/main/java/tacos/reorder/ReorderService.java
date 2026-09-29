@@ -174,7 +174,7 @@ public class ReorderService {
       return fingerprint(source, priced, request.getPaymentMethodId())
           .equals(attempt.getQuoteFingerprint())
           ? Mono.empty() : Mono.error(staleQuote());
-    }))
+    }), "REORDER")
         .flatMap(saved -> mongo.updateFirst(
                 Query.query(Criteria.where("_id").is(attempt.getId())
                     .and("completed").is(false)),

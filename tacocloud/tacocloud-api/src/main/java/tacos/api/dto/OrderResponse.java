@@ -12,6 +12,8 @@ public class OrderResponse {
   private String id;
   private Date placedAt;
   private OrderStatus status;
+  private Long version;
+  private List<StatusChange> statusHistory;
   private String userId;
   private String deliveryName;
   private String deliveryStreet;
@@ -26,6 +28,17 @@ public class OrderResponse {
   private BigDecimal discount;
   private BigDecimal total;
   private List<OrderItem> items;
+
+  @Data
+  public static class StatusChange {
+    private OrderStatus from;
+    private OrderStatus to;
+    private String actorId;
+    private String actorRole;
+    private Date changedAt;
+    private String origin;
+    private String reason;
+  }
 
   @Data
   public static class OrderItem {

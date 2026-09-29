@@ -105,7 +105,12 @@ class OrderInventoryControllerTest {
     });
 
     StepVerifier.create(orderService.createOrder(order, user()))
-        .assertNext(saved -> assertEquals("ORDER-ID", saved.getId()))
+        .assertNext(saved -> {
+          assertEquals("ORDER-ID", saved.getId());
+          assertEquals(tacos.OrderStatus.CREATED, saved.getStatus());
+          assertEquals(1, saved.getStatusHistory().size());
+          assertEquals("HTTP_API", saved.getStatusHistory().get(0).getOrigin());
+        })
         .verifyComplete();
 
     InOrder effects = inOrder(inventoryService, orderRepo, messaging);

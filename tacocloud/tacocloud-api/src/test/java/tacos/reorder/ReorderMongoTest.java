@@ -167,7 +167,9 @@ class ReorderMongoTest {
           assertFalse(result.isReplayed());
           assertNotEquals("OLD", result.getOrder().getId());
           assertTrue(result.getOrder().getPlacedAt().after(new Date(0)));
-          assertEquals(OrderStatus.PLACED, result.getOrder().getStatus());
+          assertEquals(OrderStatus.CREATED, result.getOrder().getStatus());
+          assertEquals("REORDER", result.getOrder().getStatusHistory()
+              .get(0).getOrigin());
           assertEquals(new BigDecimal("3.50"), result.getOrder().getTotal());
           assertEquals("4242", result.getOrder().getPaymentLast4());
         }).verifyComplete();

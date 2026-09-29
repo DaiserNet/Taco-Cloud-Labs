@@ -93,6 +93,12 @@ class ApiDtoContractTest {
         .exchange()
         .expectStatus().isBadRequest();
 
+    client.post().uri("/api/orders")
+        .contentType(MediaType.APPLICATION_JSON)
+        .bodyValue("{\"status\":\"DELIVERED\",\"deliveryName\":\"Client\"}")
+        .exchange()
+        .expectStatus().isBadRequest();
+
     verifyNoInteractions(orderService);
   }
 
@@ -118,7 +124,7 @@ class ApiDtoContractTest {
     assertNull(order.getId());
     assertNull(order.getUser());
     assertNotNull(order.getPlacedAt());
-    assertEquals(OrderStatus.PLACED, order.getStatus());
+    assertEquals(OrderStatus.CREATED, order.getStatus());
     assertEquals("Delivery Name", order.getDeliveryName());
     assertEquals("PAYMENT-ID", order.getPaymentMethodId());
     assertEquals(2, order.getItems().get(0).getQuantity());
@@ -147,7 +153,8 @@ class ApiDtoContractTest {
     json.fieldNames().forEachRemaining(actualFields::add);
 
     assertEquals(new LinkedHashSet<>(Arrays.asList(
-        "id", "placedAt", "status", "userId", "deliveryName", "deliveryStreet",
+        "id", "placedAt", "status", "version", "statusHistory", "userId",
+        "deliveryName", "deliveryStreet",
         "deliveryCity", "deliveryState", "deliveryZip", "paymentBrand",
         "paymentLast4", "currency", "subtotal", "discount", "total",
         "couponApplied", "items")),
