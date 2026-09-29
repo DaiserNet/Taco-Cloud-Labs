@@ -36,7 +36,8 @@ public class TacoOfDayService {
     return Mono.defer(() -> {
       LocalDate date = clock.instant().atZone(zone).toLocalDate();
       return tacoRepo.findAll()
-          .filter(taco -> StringUtils.hasText(taco.getId()))
+          .filter(taco -> StringUtils.hasText(taco.getId())
+              && taco.isPublished())
           .concatMap(taco -> designValidator.requireValid(taco)
               .onErrorResume(TacoDesignException.class, error -> Mono.empty()))
           .collectSortedList(Comparator.comparing(Taco::getId))

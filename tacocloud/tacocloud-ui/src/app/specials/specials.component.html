@@ -1,1 +1,31 @@
 <cloud-title>Check out some of our specials!</cloud-title>
+
+<h2>Top rated tacos</h2>
+<p *ngIf="topTacos.length === 0">No tacos have enough ratings yet.</p>
+<ol>
+  <li *ngFor="let taco of topTacos">
+    {{taco.tacoName}} — {{taco.average}} / 5
+    ({{taco.count}} ratings)
+    <small>Votes 1 to 5: {{taco.distribution.join(', ')}}</small>
+  </li>
+</ol>
+
+<h2>Rate a taco</h2>
+<p *ngIf="ratingMessage">{{ratingMessage}}</p>
+<ul>
+  <li *ngFor="let taco of tacos">
+    {{taco.name}}
+    <select [(ngModel)]="scores[taco.id]" [attr.aria-label]="'Score for ' + taco.name">
+      <option [ngValue]="undefined">Choose score</option>
+      <option [ngValue]="1">1</option>
+      <option [ngValue]="2">2</option>
+      <option [ngValue]="3">3</option>
+      <option [ngValue]="4">4</option>
+      <option [ngValue]="5">5</option>
+    </select>
+    <button type="button" (click)="rate(taco)">Save rating</button>
+  </li>
+</ul>
+<button type="button" (click)="loadCatalog(page - 1)" [disabled]="page === 0">Previous</button>
+<button type="button" (click)="loadCatalog(page + 1)"
+    [disabled]="page + 1 >= totalPages">Next</button>

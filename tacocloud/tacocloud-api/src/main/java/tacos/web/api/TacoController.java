@@ -75,7 +75,7 @@ public class TacoController {
 
   @GetMapping(params="recent")
   public Flux<TacoResponse> recentTacos() {
-    return tacoRepo.findAll().take(12)
+    return tacoRepo.findAll().filter(Taco::isPublished).take(12)
         .concatMap(classificationService::resolveIngredients)
         .map(this::toResponse);
   }
@@ -107,6 +107,7 @@ public class TacoController {
 
   private Mono<Taco> findResolved(String id) {
     return tacoRepo.findById(id)
+        .filter(Taco::isPublished)
         .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
         .flatMap(classificationService::resolveIngredients);
   }

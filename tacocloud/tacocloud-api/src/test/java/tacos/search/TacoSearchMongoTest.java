@@ -103,6 +103,22 @@ class TacoSearchMongoTest {
   }
 
   @Test
+  void shouldExcludeUnpublishedTacosFromPublicSearch() {
+    Taco draft = taco("H", "Hidden taco", 5000,
+        ingredient("W1", Ingredient.Type.WRAP,
+            EnumSet.of(DietaryTag.VEGAN), EnumSet.noneOf(Allergen.class),
+            SpiceLevel.NONE));
+    draft.setPublished(false);
+    StepVerifier.create(tacoRepo.save(draft)).expectNextCount(1)
+        .verifyComplete();
+
+    assertIds(new TacoSearchRequest(), "E", "C", "B", "D", "A");
+    TacoSearchRequest request = new TacoSearchRequest();
+    request.setName("Hidden");
+    assertIds(request);
+  }
+
+  @Test
   void shouldApplyEachFilterUsingCurrentIngredientClassification() {
     TacoSearchRequest request = new TacoSearchRequest();
     request.setName("Alpha");

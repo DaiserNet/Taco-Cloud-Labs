@@ -40,6 +40,7 @@ class SecurityAuthorizationTest {
     mvc.perform(get("/api/tacos/probe")).andExpect(status().isOk());
     mvc.perform(get("/api/tacos/TACO1/classification"))
         .andExpect(status().isOk());
+    mvc.perform(get("/api/tacos/top")).andExpect(status().isOk());
     mvc.perform(get("/api/ingredients/probe")).andExpect(status().isOk());
   }
 
@@ -68,6 +69,30 @@ class SecurityAuthorizationTest {
   void shouldRequireCsrfForAuthenticatedWrites() throws Exception {
     mvc.perform(post("/api/orders")).andExpect(status().isForbidden());
     mvc.perform(post("/api/tacos/validate")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "USER")
+  void shouldAllowOwnRatingWithCsrfButNotCatalogAdministration() throws Exception {
+    mvc.perform(put("/api/tacos/TACO1/rating").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(put("/api/tacos/TACO1/rating"))
+        .andExpect(status().isForbidden());
+    mvc.perform(put("/api/tacos/TACO1").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void shouldRejectAnonymousRating() throws Exception {
+    mvc.perform(put("/api/tacos/TACO1/rating").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void shouldNotGiveAdminUserRatingWithoutUserRole() throws Exception {
+    mvc.perform(put("/api/tacos/TACO1/rating").with(csrf()))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -158,7 +183,8 @@ class SecurityAuthorizationTest {
   @RestController
   static class AuthorizationProbeController {
 
-    @GetMapping({"/api/tacos/probe", "/api/tacos/TACO1/classification",
+    @GetMapping({"/api/tacos/probe", "/api/tacos/top",
+        "/api/tacos/TACO1/classification",
         "/api/ingredients/probe", "/api/orders",
         "/api/users/me/favorites", "/api/users/bob/favorites",
         "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
@@ -188,6 +214,12 @@ class SecurityAuthorizationTest {
     @org.springframework.web.bind.annotation.DeleteMapping(
         "/api/users/me/favorites/T1")
     String deleteFavorite() {
+      return "ok";
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping(
+        "/api/tacos/TACO1/rating")
+    String rateTaco() {
       return "ok";
     }
   }

@@ -92,6 +92,7 @@ public class TacoSearchService {
   private List<Criteria> filters(TacoSearchRequest request, String name,
       List<Ingredient> ingredients) {
     List<Criteria> filters = new ArrayList<>();
+    filters.add(Criteria.where("published").ne(false));
     if (name != null) {
       filters.add(Criteria.where("name")
           .regex(Pattern.compile("^" + Pattern.quote(name))));

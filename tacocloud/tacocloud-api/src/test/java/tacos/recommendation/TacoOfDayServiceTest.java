@@ -115,6 +115,19 @@ class TacoOfDayServiceTest {
   }
 
   @Test
+  void shouldExcludeUnpublishedTacosFromRecommendation() {
+    prepareCatalog();
+    Taco unpublished = taco("A", "VEGA");
+    unpublished.setPublished(false);
+    when(tacoRepo.findAll()).thenReturn(Flux.just(
+        unpublished, taco("B", "VEGB")));
+
+    StepVerifier.create(service("1970-01-01T12:00:00Z", "UTC").today())
+        .assertNext(selection -> assertEquals("B", selection.getTaco().getId()))
+        .verifyComplete();
+  }
+
+  @Test
   void shouldStopRecommendingAnUnavailableTacoOnTheNextRequest() {
     prepareCatalog();
     when(tacoRepo.findAll()).thenReturn(Flux.just(

@@ -89,6 +89,9 @@ tacocloud:
     zone: UTC
   favorites:
     max-page-size: 50
+  ratings:
+    min-votes: 2
+    max-top-limit: 50
   taco-search:
     max-size: 50
   api:

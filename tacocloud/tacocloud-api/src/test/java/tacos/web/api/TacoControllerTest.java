@@ -123,6 +123,27 @@ public class TacoControllerTest {
   }
 
   @Test
+  void shouldHideUnpublishedTacoFromPublicCatalogRoutes() {
+    TacoRepository tacoRepo = Mockito.mock(TacoRepository.class);
+    IngredientRepository ingredientRepo = ingredients();
+    Taco draft = testTaco(1L);
+    draft.setPublished(false);
+    when(tacoRepo.findById("1")).thenReturn(Mono.just(draft));
+    when(tacoRepo.findAll()).thenReturn(Flux.just(draft, testTaco(2L)));
+    WebTestClient client = WebTestClient.bindToController(
+        controller(tacoRepo, ingredientRepo)).build();
+
+    client.get().uri("/api/tacos/1").exchange()
+        .expectStatus().isNotFound();
+    client.get().uri("/api/tacos/1/classification").exchange()
+        .expectStatus().isNotFound();
+    client.get().uri("/api/tacos?recent").exchange()
+        .expectStatus().isOk().expectBody()
+        .jsonPath("$[0].id").isEqualTo("2")
+        .jsonPath("$[1]").doesNotExist();
+  }
+
+  @Test
   void shouldRejectForgedClassificationOnCatalogPost() {
     TacoRepository tacoRepo = Mockito.mock(TacoRepository.class);
     IngredientRepository ingredientRepo = ingredients();
