@@ -87,6 +87,8 @@ info:
 tacocloud:
   taco-of-day:
     zone: UTC
+  favorites:
+    max-page-size: 50
   taco-search:
     max-size: 50
   api:

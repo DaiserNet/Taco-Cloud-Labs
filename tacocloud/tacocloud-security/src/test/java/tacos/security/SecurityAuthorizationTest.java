@@ -3,8 +3,10 @@ package tacos.security;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
@@ -70,6 +72,33 @@ class SecurityAuthorizationTest {
 
   @Test
   @WithMockUser(roles = "USER")
+  void shouldAllowOnlyOwnFavoriteRoutesWithCsrf() throws Exception {
+    mvc.perform(get("/api/users/me/favorites")).andExpect(status().isOk());
+    mvc.perform(put("/api/users/me/favorites/T1").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(delete("/api/users/me/favorites/T1").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(put("/api/users/me/favorites/T1"))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/users/bob/favorites"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void shouldRequireAuthenticationForFavorites() throws Exception {
+    mvc.perform(get("/api/users/me/favorites"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void shouldNotGrantFavoritesToAdminWithoutUserRole() throws Exception {
+    mvc.perform(get("/api/users/me/favorites"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @WithMockUser(roles = "USER")
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
     mvc.perform(post("/api/tacos").with(csrf())).andExpect(status().isForbidden());
@@ -131,6 +160,7 @@ class SecurityAuthorizationTest {
 
     @GetMapping({"/api/tacos/probe", "/api/tacos/TACO1/classification",
         "/api/ingredients/probe", "/api/orders",
+        "/api/users/me/favorites", "/api/users/bob/favorites",
         "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
     String read() {
       return "ok";
@@ -146,6 +176,18 @@ class SecurityAuthorizationTest {
 
     @PatchMapping("/api/admin/ingredients/FLTO/catalog")
     String patchCatalog() {
+      return "ok";
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping(
+        "/api/users/me/favorites/T1")
+    String addFavorite() {
+      return "ok";
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping(
+        "/api/users/me/favorites/T1")
+    String deleteFavorite() {
       return "ok";
     }
   }

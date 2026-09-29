@@ -3,6 +3,8 @@
 <p>Even the greatest artists sometimes need to be inspired by the works of others.
   Here are some of the most recently created tacos, designed by taco artists just like you...</p>
 
+<p *ngIf="favoriteMessage">{{favoriteMessage}}</p>
+
 <div class="recentsblock">
   <div class="tacoblock" *ngFor="let taco of recentTacos">
       <div class="tacoName"><span class="small">The</span><br/>"{{taco.name}}"</div>
@@ -23,6 +25,10 @@
         <div>Spice level: {{taco.classification.spiceLevel}}</div>
         <small>{{taco.classification.disclaimer}}</small>
       </div>
+      <button type="button" (click)="toggleFavorite(taco)"
+          [attr.aria-pressed]="isFavorite(taco.id)">
+        {{isFavorite(taco.id) ? 'Remove favorite' : 'Add to favorites'}}
+      </button>
       <little-button label="Order this taco"></little-button>
   </div>
 </div>
