@@ -6,22 +6,28 @@ import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 
 @Service
+@ConditionalOnProperty(name = "tacocloud.messaging.transport", havingValue = "rabbitmq")
 public class RabbitOrderMessagingService
        implements OrderMessagingService {
   
-  private RabbitTemplate rabbit;
+  private final RabbitTemplate rabbit;
+  private final String destination;
   
   @Autowired
-  public RabbitOrderMessagingService(RabbitTemplate rabbit) {
+  public RabbitOrderMessagingService(RabbitTemplate rabbit,
+      @Value("${tacocloud.messaging.rabbitmq.destination}") String destination) {
     this.rabbit = rabbit;
+    this.destination = destination;
   }
   
   public void sendOrder(OrderEvent event) {
-    rabbit.convertAndSend("tacocloud.order.queue", event,
+    rabbit.convertAndSend(destination, event,
         new MessagePostProcessor() {
           @Override
           public Message postProcessMessage(Message message)

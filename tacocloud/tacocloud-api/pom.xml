@@ -55,21 +55,21 @@
 			<artifactId>tacocloud-messaging-noop</artifactId>
 			<version>${tacocloud.version}</version>
 		</dependency>
-<!--  		<dependency>
+		<dependency>
 			<groupId>sia</groupId>
 			<artifactId>tacocloud-messaging-jms</artifactId>
 			<version>${tacocloud.version}</version>
-		</dependency> -->
- 		<!-- <dependency>
+		</dependency>
+		<dependency>
 			<groupId>sia</groupId>
 			<artifactId>tacocloud-messaging-rabbitmq</artifactId>
 			<version>${tacocloud.version}</version>
-		</dependency> -->
-<!--   		<dependency>
+		</dependency>
+		<dependency>
 			<groupId>sia</groupId>
 			<artifactId>tacocloud-messaging-kafka</artifactId>
 			<version>${tacocloud.version}</version>
-		</dependency> -->
+		</dependency>
 
 		<!-- Necessary Boot starters -->
 		<dependency>
@@ -111,11 +111,6 @@
 			<artifactId>spring-web</artifactId>
 		</dependency>
 
-
-		<!-- <dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-artemis</artifactId>
-		</dependency> -->
 	</dependencies>
 
 </project>

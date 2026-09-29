@@ -19,7 +19,7 @@ public class OrderListener {
     this.ui = ui;
   }
 
-  @JmsListener(destination = "tacocloud.order.queue")
+  @JmsListener(destination = "${tacocloud.messaging.jms.destination}")
   public void receiveOrder(OrderEvent order) {
     ui.displayOrder(order);
   }

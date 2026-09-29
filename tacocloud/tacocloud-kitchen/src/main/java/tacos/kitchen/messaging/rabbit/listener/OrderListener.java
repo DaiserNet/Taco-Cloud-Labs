@@ -19,7 +19,7 @@ public class OrderListener {
     this.ui = ui;
   }
 
-  @RabbitListener(queues = "tacocloud.order.queue")
+  @RabbitListener(queues = "${tacocloud.messaging.rabbitmq.destination}")
   public void receiveOrder(OrderEvent order) {
     ui.displayOrder(order);
   }
