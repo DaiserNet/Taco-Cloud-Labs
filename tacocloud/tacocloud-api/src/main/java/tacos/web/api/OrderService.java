@@ -1,6 +1,7 @@
 package tacos.web.api;
 
 import java.util.Set;
+import java.util.function.Function;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validator;
@@ -55,6 +56,12 @@ public class OrderService {
 
   public Mono<TacoOrder> createOrder(
       TacoOrder order, Authentication authentication) {
+    return createOrder(order, authentication, priced -> Mono.empty());
+  }
+
+  public Mono<TacoOrder> createOrder(TacoOrder order,
+      Authentication authentication,
+      Function<TacoOrder, Mono<Void>> beforeReservation) {
     return currentUser(authentication)
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
@@ -64,7 +71,8 @@ public class OrderService {
                   pricedOrder.setUser(user);
                   pricedOrder.setPaymentBrand(payment.getBrand());
                   pricedOrder.setPaymentLast4(payment.getLast4());
-                  return reserveSaveAndAccept(pricedOrder);
+                  return Mono.defer(() -> beforeReservation.apply(pricedOrder))
+                      .then(Mono.defer(() -> reserveSaveAndAccept(pricedOrder)));
                 })
                 .flatMap(this::publish)));
   }

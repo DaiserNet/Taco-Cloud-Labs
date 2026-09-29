@@ -54,11 +54,16 @@ public class OrderHistoryService {
 
   public Mono<OrderResponse> myOrder(String orderId,
       Authentication authentication) {
+    return findOwnedOrder(orderId, authentication)
+        .map(orderMapper::toResponse);
+  }
+
+  public Mono<TacoOrder> findOwnedOrder(String orderId,
+      Authentication authentication) {
     return currentUser(authentication)
         .flatMap(user -> mongo.findOne(Query.query(owner(user.getId())
             .and("_id").is(orderId)), TacoOrder.class))
-        .switchIfEmpty(notFound())
-        .map(orderMapper::toResponse);
+        .switchIfEmpty(notFound());
   }
 
   public Mono<OrderHistoryPageResponse> adminOrders(int page, int size,

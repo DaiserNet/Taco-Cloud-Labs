@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -32,6 +33,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -111,6 +113,24 @@ class OrderInventoryControllerTest {
     effects.verify(orderRepo).save(order);
     effects.verify(inventoryService).accept("RESERVATION-ID", "ORDER-ID");
     effects.verify(messaging).sendOrder(order);
+  }
+
+  @Test
+  void shouldRejectChangedQuoteBeforeInventoryOrPersistence() {
+    TacoOrder order = requestedOrder();
+    prepareOwnerAndPayment();
+
+    StepVerifier.create(orderService.createOrder(order, user(), priced ->
+        Mono.error(new ResponseStatusException(HttpStatus.CONFLICT,
+            "Quote changed."))))
+        .expectErrorMatches(error -> error instanceof ResponseStatusException
+            && ((ResponseStatusException) error).getStatus()
+                == HttpStatus.CONFLICT)
+        .verify();
+
+    verify(pricingService).price(order);
+    verify(couponService).apply(order);
+    verifyNoInteractions(inventoryService, orderRepo, messaging);
   }
 
   @Test

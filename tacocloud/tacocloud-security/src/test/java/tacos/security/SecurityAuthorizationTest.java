@@ -59,6 +59,10 @@ class SecurityAuthorizationTest {
     mvc.perform(get("/api/orders/me")).andExpect(status().isOk());
     mvc.perform(get("/api/orders/me/OWN")).andExpect(status().isOk());
     mvc.perform(post("/api/orders").with(csrf())).andExpect(status().isOk());
+    mvc.perform(post("/api/orders/me/OWN/reorder/quote").with(csrf()))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/orders/me/OWN/reorder").with(csrf()))
+        .andExpect(status().isOk());
     mvc.perform(post("/api/payment-methods/tokenize").with(csrf()))
         .andExpect(status().isOk());
     mvc.perform(post("/api/tacos/validate").with(csrf()))
@@ -69,6 +73,10 @@ class SecurityAuthorizationTest {
   @WithMockUser(roles = "USER")
   void shouldRequireCsrfForAuthenticatedWrites() throws Exception {
     mvc.perform(post("/api/orders")).andExpect(status().isForbidden());
+    mvc.perform(post("/api/orders/me/OWN/reorder/quote"))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/orders/me/OWN/reorder"))
+        .andExpect(status().isForbidden());
     mvc.perform(post("/api/tacos/validate")).andExpect(status().isForbidden());
   }
 
@@ -124,6 +132,15 @@ class SecurityAuthorizationTest {
   }
 
   @Test
+  @WithMockUser(roles = "ADMIN")
+  void shouldDenyAdminReorderWithoutUserRole() throws Exception {
+    mvc.perform(post("/api/orders/me/OWN/reorder/quote").with(csrf()))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/orders/me/OWN/reorder").with(csrf()))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   @WithMockUser(roles = "USER")
   void shouldForbidUserFromAdministrationAndKitchen() throws Exception {
     mvc.perform(post("/api/ingredients").with(csrf())).andExpect(status().isForbidden());
@@ -159,6 +176,8 @@ class SecurityAuthorizationTest {
   void shouldRequireAuthenticationForOrderHistory() throws Exception {
     mvc.perform(get("/api/orders/me")).andExpect(status().isUnauthorized());
     mvc.perform(get("/api/admin/orders")).andExpect(status().isUnauthorized());
+    mvc.perform(post("/api/orders/me/OWN/reorder/quote").with(csrf()))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -212,6 +231,7 @@ class SecurityAuthorizationTest {
 
     @PostMapping({"/api/orders", "/api/ingredients", "/api/kitchen/queue",
         "/api/tacos/validate", "/api/tacos",
+        "/api/orders/me/OWN/reorder/quote", "/api/orders/me/OWN/reorder",
         "/api/payment-methods/tokenize",
         "/api/admin/ingredients/FLTO/stock-adjustments"})
     String write() {

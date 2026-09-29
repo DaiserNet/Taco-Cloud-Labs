@@ -61,6 +61,32 @@ public class OrderMapper {
         order.getStatus(), order.getTotal(), order.getCurrency());
   }
 
+  public OrderCreateRequest toReorderRequest(TacoOrder source,
+      String paymentMethodId, String couponCode) {
+    OrderCreateRequest request = new OrderCreateRequest();
+    request.setDeliveryName(source.getDeliveryName());
+    request.setDeliveryStreet(source.getDeliveryStreet());
+    request.setDeliveryCity(source.getDeliveryCity());
+    request.setDeliveryState(source.getDeliveryState());
+    request.setDeliveryZip(source.getDeliveryZip());
+    request.setPaymentMethodId(paymentMethodId);
+    request.setCouponCode(couponCode);
+    request.setItems(responseLines(source).stream().map(line -> {
+      OrderCreateRequest.OrderItem item = new OrderCreateRequest.OrderItem();
+      OrderCreateRequest.TacoItem taco = new OrderCreateRequest.TacoItem();
+      if (line != null && line.getTaco() != null) {
+        taco.setName(line.getTaco().getName());
+        taco.setIngredientIds(safe(line.getTaco().getIngredients()).stream()
+            .map(ingredient -> ingredient == null ? null : ingredient.getId())
+            .collect(Collectors.toList()));
+        item.setTaco(taco);
+        item.setQuantity(line.getQuantity());
+      }
+      return item;
+    }).collect(Collectors.toList()));
+    return request;
+  }
+
   private OrderLine toEntityLine(OrderCreateRequest.OrderItem request) {
     OrderLine line = new OrderLine();
     if (request != null) {
