@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import tacos.TacoOrder;
+import tacos.messaging.OrderEvent;
 import tacos.kitchen.KitchenUI;
 
 @Profile("rabbitmq-listener")
@@ -20,7 +20,7 @@ public class OrderListener {
   }
 
   @RabbitListener(queues = "tacocloud.order.queue")
-  public void receiveOrder(TacoOrder order) {
+  public void receiveOrder(OrderEvent order) {
     ui.displayOrder(order);
   }
   

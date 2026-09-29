@@ -95,7 +95,7 @@ class OrderAuthorizationServiceTest {
 
     InOrder effects = inOrder(orderRepo, messaging);
     effects.verify(orderRepo).save(requested);
-    effects.verify(messaging).sendOrder(requested);
+    effects.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test

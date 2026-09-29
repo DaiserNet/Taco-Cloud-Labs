@@ -1,0 +1,1 @@
+{"eventId":"123e4567-e89b-42d3-a456-426614174000","eventType":"ORDER_CREATED","version":1,"occurredAt":"2026-01-02T03:04:05Z","correlationId":"ORDER-1","payload":{"orderId":"ORDER-1","items":[{"tacoName":"Veggie taco","quantity":2,"ingredients":[{"id":"FLTO","name":"Flour Tortilla","type":"WRAP"}]}]}}

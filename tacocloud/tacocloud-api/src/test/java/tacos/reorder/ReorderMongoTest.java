@@ -196,7 +196,7 @@ class ReorderMongoTest {
           assertEquals(new BigDecimal("3.50"), result.getOrder().getTotal());
         }).verifyComplete();
     assertCountAndStock(2, 8);
-    verify(messaging, times(1)).sendOrder(any(TacoOrder.class));
+    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test
@@ -306,7 +306,7 @@ class ReorderMongoTest {
                 == HttpStatus.CONFLICT)
         .verify();
     assertCountAndStock(2, 8);
-    verify(messaging, times(1)).sendOrder(any(TacoOrder.class));
+    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
 
     ReorderRequest invalidCoupon = request(null);
     invalidCoupon.setCouponCode("EXPIRED");

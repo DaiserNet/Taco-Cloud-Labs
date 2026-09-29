@@ -4,7 +4,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
 
-import tacos.TacoOrder;
+import tacos.messaging.OrderEvent;
 import tacos.kitchen.OrderReceiver;
 
 @Profile("jms-template")
@@ -18,8 +18,8 @@ public class JmsOrderReceiver implements OrderReceiver {
   }
   
   @Override
-  public TacoOrder receiveOrder() {
-    return (TacoOrder) jms.receiveAndConvert("tacocloud.order.queue");
+  public OrderEvent receiveOrder() {
+    return (OrderEvent) jms.receiveAndConvert("tacocloud.order.queue");
   }
   
 }

@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jms.support.converter.MappingJackson2MessageConverter;
 
-import tacos.TacoOrder;
+import tacos.messaging.OrderEvent;
 
 @Profile({"jms-template", "jms-listener"})
 @Configuration
@@ -21,7 +21,7 @@ public class MessagingConfig {
     messageConverter.setTypeIdPropertyName("_typeId");
     
     Map<String, Class<?>> typeIdMappings = new HashMap<String, Class<?>>();
-    typeIdMappings.put("order", TacoOrder.class);
+    typeIdMappings.put("order", OrderEvent.class);
     messageConverter.setTypeIdMappings(typeIdMappings);
     
     return messageConverter;

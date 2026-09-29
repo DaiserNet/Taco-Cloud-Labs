@@ -30,8 +30,8 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       group-id: tacocloud_kitchen
       properties:
-        spring.json.trusted.packages: tacos
-      
+        spring.json.trusted.packages: tacos.messaging
+
       
       
       

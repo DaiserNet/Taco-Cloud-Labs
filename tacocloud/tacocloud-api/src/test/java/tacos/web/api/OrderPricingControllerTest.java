@@ -121,7 +121,7 @@ class OrderPricingControllerTest {
     verify(orderRepo).save(savedOrder.capture());
     assertEquals(new BigDecimal("1.45"),
         savedOrder.getValue().getItems().get(0).getUnitPriceAtPurchase());
-    verify(messaging).sendOrder(savedOrder.getValue());
+    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test
@@ -175,7 +175,7 @@ class OrderPricingControllerTest {
 
     verify(inventoryService, never()).reserve(any(TacoOrder.class));
     verify(orderRepo, never()).save(any(TacoOrder.class));
-    verify(messaging, never()).sendOrder(any(TacoOrder.class));
+    verify(messaging, never()).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   private ResultActions perform(

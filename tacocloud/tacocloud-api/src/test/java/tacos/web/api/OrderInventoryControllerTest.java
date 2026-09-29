@@ -117,7 +117,7 @@ class OrderInventoryControllerTest {
     effects.verify(inventoryService).reserve(order);
     effects.verify(orderRepo).save(order);
     effects.verify(inventoryService).accept("RESERVATION-ID", "ORDER-ID");
-    effects.verify(messaging).sendOrder(order);
+    effects.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test

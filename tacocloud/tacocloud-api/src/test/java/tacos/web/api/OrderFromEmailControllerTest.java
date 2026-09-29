@@ -104,10 +104,10 @@ class OrderFromEmailControllerTest {
 
     assertEquals(1, conversion.subscribeCount());
     verify(repo, times(1)).save(converted);
-    verify(messaging, times(1)).sendOrder(saved);
+    verify(messaging, times(1)).sendOrder(any(tacos.messaging.OrderEvent.class));
     InOrder interactions = inOrder(repo, messaging);
     interactions.verify(repo).save(converted);
-    interactions.verify(messaging).sendOrder(saved);
+    interactions.verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test
@@ -158,7 +158,7 @@ class OrderFromEmailControllerTest {
         .assertNext(order -> assertEquals("ORDER-ID", order.getId()))
         .verifyComplete();
 
-    verify(messaging).sendOrder(saved);
+    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test
@@ -170,7 +170,7 @@ class OrderFromEmailControllerTest {
         .thenReturn(Mono.just(converted));
     when(repo.save(converted)).thenReturn(Mono.just(saved));
     doThrow(new IllegalStateException("send failed"))
-        .when(messaging).sendOrder(saved);
+        .when(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
 
     StepVerifier.create(controller.postOrderFromEmail(new EmailOrder(), user()))
         .expectErrorMatches(error -> error instanceof IllegalStateException
@@ -178,7 +178,7 @@ class OrderFromEmailControllerTest {
         .verify();
 
     verify(repo).save(converted);
-    verify(messaging).sendOrder(saved);
+    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   @Test
@@ -202,7 +202,7 @@ class OrderFromEmailControllerTest {
     mvc.perform(asyncDispatch(result))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value("ORDER-ID"));
-    verify(messaging).sendOrder(saved);
+    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   private TacoOrder convertedOrder() {

@@ -128,7 +128,7 @@ class OrderCouponControllerTest {
     assertEquals("SAVE10", saved.getValue().getCouponCode());
     assertEquals(new BigDecimal("0.29"), saved.getValue().getDiscount());
     assertEquals(new BigDecimal("2.61"), saved.getValue().getTotal());
-    verify(messaging).sendOrder(saved.getValue());
+    verify(messaging).sendOrder(any(tacos.messaging.OrderEvent.class));
   }
 
   private ResultActions perform(

@@ -187,7 +187,7 @@ public class OrderService {
   }
 
   private Mono<TacoOrder> publish(TacoOrder order) {
-    return Mono.fromRunnable(() -> orderMessages.sendOrder(order))
+    return Mono.fromRunnable(() -> orderMessages.sendOrder(OrderEventFactory.created(order)))
         .thenReturn(order);
   }
 
