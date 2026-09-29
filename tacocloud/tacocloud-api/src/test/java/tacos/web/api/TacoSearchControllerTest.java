@@ -41,7 +41,7 @@ class TacoSearchControllerTest {
             PageRequest.of(0, 1), 2)));
     TacoController controller = new TacoController(mock(TacoRepository.class),
         new TacoClassificationService(null), new IngredientMapper(),
-        mock(TacoDesignValidator.class), search);
+        mock(TacoDesignValidator.class), search, null);
 
     WebTestClient.bindToController(controller).build().get()
         .uri("/api/tacos?name=Alpha&ingredientId=W1&diet=VEGAN"

@@ -21,6 +21,7 @@ import tacos.Taco;
 import tacos.api.dto.TacoClassification;
 import tacos.api.dto.TacoCreateRequest;
 import tacos.api.dto.TacoDesignValidationResponse;
+import tacos.api.dto.TacoOfDayResponse;
 import tacos.api.dto.TacoResponse;
 import tacos.api.dto.TacoSearchRequest;
 import tacos.api.dto.TacoSearchResponse;
@@ -29,6 +30,7 @@ import tacos.classification.TacoClassificationService;
 import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
 import tacos.search.TacoSearchService;
+import tacos.recommendation.TacoOfDayService;
 
 @RestController
 @RequestMapping(path = "/api/tacos", produces = "application/json")
@@ -38,16 +40,26 @@ public class TacoController {
   private final IngredientMapper ingredientMapper;
   private final TacoDesignValidator designValidator;
   private final TacoSearchService searchService;
+  private final TacoOfDayService tacoOfDayService;
 
   public TacoController(TacoRepository tacoRepo,
       TacoClassificationService classificationService,
       IngredientMapper ingredientMapper, TacoDesignValidator designValidator,
-      TacoSearchService searchService) {
+      TacoSearchService searchService, TacoOfDayService tacoOfDayService) {
     this.tacoRepo = tacoRepo;
     this.classificationService = classificationService;
     this.ingredientMapper = ingredientMapper;
     this.designValidator = designValidator;
     this.searchService = searchService;
+    this.tacoOfDayService = tacoOfDayService;
+  }
+
+  @GetMapping("/today")
+  public Mono<TacoOfDayResponse> tacoOfDay() {
+    return tacoOfDayService.today()
+        .map(selection -> new TacoOfDayResponse(
+            toResponse(selection.getTaco()), selection.getDate(),
+            selection.getReason()));
   }
 
   @GetMapping

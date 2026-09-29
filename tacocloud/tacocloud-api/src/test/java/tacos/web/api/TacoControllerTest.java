@@ -195,7 +195,7 @@ public class TacoControllerTest {
       TacoRepository tacoRepo, IngredientRepository ingredientRepo) {
     return new TacoController(tacoRepo,
         new TacoClassificationService(ingredientRepo), new IngredientMapper(),
-        TacoDesignTestSupport.validator(ingredientRepo), null);
+        TacoDesignTestSupport.validator(ingredientRepo), null, null);
   }
 
   private IngredientRepository ingredients() {

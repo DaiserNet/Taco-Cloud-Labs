@@ -85,6 +85,8 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  taco-of-day:
+    zone: UTC
   taco-search:
     max-size: 50
   api:

@@ -19,6 +19,7 @@ import tacos.classification.TacoClassificationService;
 import tacos.design.TacoDesignValidator;
 import tacos.data.TacoRepository;
 import tacos.search.TacoSearchService;
+import tacos.recommendation.TacoOfDayService;
 
 @WebMvcTest(TacoController.class)
 @Import(ApiCorsConfiguration.class)
@@ -45,6 +46,9 @@ class ApiCorsConfigurationTest {
 
   @MockBean
   private TacoSearchService searchService;
+
+  @MockBean
+  private TacoOfDayService tacoOfDayService;
 
   @Test
   void shouldAllowConfiguredOriginForApiPreflight() throws Exception {
