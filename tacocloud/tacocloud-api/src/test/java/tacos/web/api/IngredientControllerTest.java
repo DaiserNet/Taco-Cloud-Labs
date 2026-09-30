@@ -167,6 +167,21 @@ public class IngredientControllerTest {
     }
 
     @Test
+    public void shouldCreateIngredientWithVersionedLocation() {
+        Ingredient ingredient = new Ingredient("PICK", "Pickle",
+            Ingredient.Type.VEGGIES);
+        Mockito.when(repo.save(Mockito.any(Ingredient.class)))
+            .thenReturn(Mono.just(ingredient));
+
+        testClient.post().uri("/api/v1/ingredients")
+            .bodyValue(request("PICK", "Pickle", Ingredient.Type.VEGGIES))
+            .exchange()
+            .expectStatus().isCreated()
+            .expectHeader().valueMatches("Location", ".*/api/v1/ingredients/PICK")
+            .expectBody().jsonPath("$.id").isEqualTo("PICK");
+    }
+
+    @Test
     public void shouldExposeConfiguredIngredientClassificationMetadata() {
         IngredientRequest request = request("SLSA", "Hot salsa",
             Ingredient.Type.SAUCE);

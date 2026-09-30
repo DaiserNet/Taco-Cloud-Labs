@@ -1,0 +1,1353 @@
+openapi: 3.0.3
+info:
+  title: Taco Cloud HTTP API
+  version: 1.0.0
+  description: |
+    Contrato público de /api/v1. Las rutas /api equivalentes siguen disponibles
+    durante la transición y responden con Deprecation y Link al sucesor.
+    Las escrituras autenticadas por sesión requieren X-XSRF-TOKEN. El servidor
+    acepta X-Correlation-Id y devuelve el identificador efectivo en ese header.
+    GET /api/v1/tacos?recent conserva la respuesta de lista del cliente antiguo.
+servers:
+  - url: /
+security:
+  - basicAuth: []
+tags:
+  - name: Ingredients
+  - name: Tacos
+  - name: Orders
+  - name: Favorites
+  - name: Ratings
+  - name: Kitchen
+  - name: Admin
+  - name: Payments
+paths:
+  /api/v1/ingredients:
+    get:
+      tags: [Ingredients]
+      summary: Listar ingredientes públicos
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/IngredientList' }
+    post:
+      tags: [Ingredients]
+      summary: Crear ingrediente del catálogo
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/IngredientRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/IngredientCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/ingredients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Ingredients]
+      summary: Consultar ingrediente
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ingredient' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Ingredients]
+      summary: Reemplazar ingrediente existente
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/IngredientRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Ingredient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Ingredients]
+      summary: Eliminar ingrediente existente
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/ingredients/{id}/catalog:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Admin, Ingredients]
+      summary: Cambiar precio, disponibilidad o nivel de reposición
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/IngredientCatalogUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/IngredientAdmin' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/admin/ingredients/{id}/stock-adjustments:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Admin, Ingredients]
+      summary: Ajustar existencias con versión esperada
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/StockAdjustment' }
+      responses:
+        '200': { $ref: '#/components/responses/IngredientAdmin' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/tacos:
+    get:
+      tags: [Tacos]
+      summary: Buscar tacos publicados
+      description: Con el parámetro recent se devuelve una lista de hasta 12 tacos.
+      security: []
+      parameters:
+        - { name: name, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: ingredientId, in: query, schema: { type: string } }
+        - { name: diet, in: query, schema: { $ref: '#/components/schemas/DietaryTag' } }
+        - { name: excludeAllergen, in: query, schema: { $ref: '#/components/schemas/Allergen' } }
+        - { name: spice, in: query, schema: { $ref: '#/components/schemas/SpiceLevel' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, default: 20 } }
+        - { name: sort, in: query, schema: { type: string, default: 'createdAt,desc' } }
+        - { name: recent, in: query, schema: { type: string }, description: Modo legado de lista. }
+      responses:
+        '200':
+          description: Página de búsqueda o lista recent.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TacoSearchResponse'
+                  - type: array
+                    items: { $ref: '#/components/schemas/TacoResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [Tacos]
+      summary: Publicar un taco en el catálogo
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/TacoCreateRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/TacoCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/tacos/validate:
+    post:
+      tags: [Tacos]
+      summary: Validar un diseño sin guardarlo
+      x-required-role: USER o ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/TacoCreateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/TacoDesignValidation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/tacos/today:
+    get:
+      tags: [Tacos]
+      summary: Consultar el taco del día
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/TacoOfDay' }
+  /api/v1/tacos/top:
+    get:
+      tags: [Tacos, Ratings]
+      summary: Consultar los tacos mejor valorados
+      security: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, default: 10 } }
+      responses:
+        '200': { $ref: '#/components/responses/TacoRankingList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/tacos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Tacos]
+      summary: Consultar un taco publicado
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Taco' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/tacos/{id}/classification:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Tacos]
+      summary: Consultar clasificación dietaria y alérgenos
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/TacoClassification' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/tacos/{id}/rating:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Ratings]
+      summary: Valorar un taco de 1 a 5
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/TacoRatingRequest' }
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/users/me/favorites:
+    get:
+      tags: [Favorites]
+      summary: Listar favoritos propios con paginación
+      x-required-role: USER
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/FavoritePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/users/me/favorites/{tacoId}:
+    parameters:
+      - { name: tacoId, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [Favorites]
+      summary: Agregar taco a favoritos
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Favorites]
+      summary: Quitar taco de favoritos
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/payment-methods/tokenize:
+    post:
+      tags: [Payments]
+      summary: Tokenizar tarjeta para el usuario autenticado
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/PaymentTokenizeRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/PaymentMethodCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Crear una orden
+      description: |
+        Idempotency-Key es opcional para compatibilidad. Con la misma clave y
+        el mismo contenido devuelve el mismo orderId y HTTP 201. Otra carga
+        con esa clave responde 409. Un claim pendiente también puede responder 409.
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderCreateRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/OrderCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/orders/fromEmail:
+    post:
+      tags: [Orders]
+      summary: Crear una orden desde datos de correo convertidos
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/EmailOrder' }
+      responses:
+        '201': { $ref: '#/components/responses/OrderCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/orders/quote:
+    post:
+      tags: [Orders]
+      summary: Cotizar cupón y clasificación de taco
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderQuoteRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/OrderQuote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/orders/{orderId}:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [Orders]
+      summary: Reemplazar datos de entrega de una orden editable
+      x-required-role: USER o ADMIN propietario
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderReplaceRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    patch:
+      tags: [Orders]
+      summary: Modificar campos de entrega permitidos
+      x-required-role: USER o ADMIN propietario
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderPatchRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Orders]
+      summary: Eliminar una orden en estado permitido
+      x-required-role: USER o ADMIN propietario
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/orders/{orderId}/status:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Orders, Admin]
+      summary: Cambiar estado de una orden con versión esperada
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderStatusRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/orders/{orderId}/cancel:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Orders]
+      summary: Cancelar una orden propia con versión esperada
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderCancelRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/orders/me:
+    get:
+      tags: [Orders]
+      summary: Listar órdenes propias
+      x-required-role: USER
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, default: 10 } }
+      responses:
+        '200': { $ref: '#/components/responses/OrderHistoryPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/orders/me/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders]
+      summary: Consultar detalle de una orden propia
+      x-required-role: USER
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/orders/me/{sourceOrderId}/reorder/quote:
+    parameters:
+      - { name: sourceOrderId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Orders]
+      summary: Cotizar una recompra
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/ReorderRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ReorderQuote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/orders/me/{sourceOrderId}/reorder:
+    parameters:
+      - { name: sourceOrderId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Orders]
+      summary: Confirmar una recompra idempotente
+      x-required-role: USER
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/ReorderRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/ReorderConfirm' }
+        '200': { $ref: '#/components/responses/ReorderConfirm' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/orders:
+    get:
+      tags: [Orders, Admin]
+      summary: Auditar órdenes con filtros
+      x-required-role: ADMIN
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, default: 10 } }
+        - { name: userId, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
+      responses:
+        '200': { $ref: '#/components/responses/OrderHistoryPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders, Admin]
+      summary: Consultar detalle de una orden para auditoría
+      x-required-role: ADMIN
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/kitchen/ui:
+    get:
+      tags: [Kitchen]
+      summary: Abrir la interfaz HTML de cocina
+      x-required-role: KITCHEN
+      responses:
+        '200': { $ref: '#/components/responses/KitchenHtml' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/kitchen/queue:
+    get:
+      tags: [Kitchen]
+      summary: Consultar cola de cocina
+      x-required-role: KITCHEN
+      responses:
+        '200': { $ref: '#/components/responses/KitchenOrderList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/kitchen/claim:
+    post:
+      tags: [Kitchen]
+      summary: Reclamar siguiente orden de la cola
+      x-required-role: KITCHEN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200': { $ref: '#/components/responses/KitchenOrder' }
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/kitchen/orders/{orderId}/status:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Kitchen]
+      summary: Avanzar una orden asignada a cocina
+      x-required-role: KITCHEN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/OrderStatusRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/KitchenOrder' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/announcements:
+    get:
+      tags: [Admin]
+      summary: Listar anuncios operativos vigentes
+      x-required-role: ADMIN
+      responses:
+        '200': { $ref: '#/components/responses/AnnouncementList' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Admin]
+      summary: Crear anuncio operativo
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody: { $ref: '#/components/requestBodies/AnnouncementRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/AnnouncementCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/admin/announcements/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Admin]
+      summary: Consultar anuncio operativo vigente
+      x-required-role: ADMIN
+      responses:
+        '200': { $ref: '#/components/responses/Announcement' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Admin]
+      summary: Desactivar anuncio operativo
+      x-required-role: ADMIN
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: Autenticación Basic o sesión autenticada de la UI.
+  headers:
+    CorrelationId:
+      description: Identificador de correlación efectivo para esta petición.
+      schema: { type: string, maxLength: 100 }
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,100}$' }
+      description: El servidor genera un ID si el recibido no es válido.
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' }
+    CsrfToken:
+      name: X-XSRF-TOKEN
+      in: header
+      required: true
+      schema: { type: string }
+      description: Requerido para escrituras autenticadas por sesión. Se obtiene de la cookie XSRF-TOKEN.
+  requestBodies:
+    IngredientRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/IngredientRequest' }
+          example: { id: WRAP, name: Flour tortilla, type: WRAP, dietaryTags: [VEGETARIAN], allergens: [GLUTEN], spiceLevel: NONE }
+    IngredientCatalogUpdate:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/IngredientCatalogUpdateRequest' }
+          example: { expectedVersion: 3, unitPrice: 1.25, available: true }
+    StockAdjustment:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/StockAdjustmentRequest' }
+          example: { expectedVersion: 3, adjustment: 10 }
+    TacoCreateRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoCreateRequest' }
+          example: { name: Garden taco, ingredients: [{ id: WRAP }, { id: SLSA }] }
+    TacoRatingRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoRatingRequest' }
+          example: { score: 5 }
+    PaymentTokenizeRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentTokenizeRequest' }
+          example: { pan: '4111111111111111', expiration: '12/29', cvv: '123' }
+    OrderCreateRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderCreateRequest' }
+          example:
+            deliveryName: Alice
+            deliveryStreet: Street 1
+            deliveryCity: Austin
+            deliveryState: TX
+            deliveryZip: '78701'
+            paymentMethodId: PAYMENT-ID
+            items:
+              - taco: { name: Garden taco, ingredientIds: [WRAP, SLSA] }
+                quantity: 2
+    EmailOrder:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/EmailOrder' }
+    OrderQuoteRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderQuoteRequest' }
+          example: { subtotal: 12.50, couponCode: CLASS10, tacoId: TACO-ID }
+    OrderPatchRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderPatchRequest' }
+          example: { deliveryZip: '78702' }
+    OrderReplaceRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderReplaceRequest' }
+    OrderStatusRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderStatusRequest' }
+          example: { status: ACCEPTED, expectedVersion: 1, reason: Accepted by staff }
+    OrderCancelRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderCancelRequest' }
+          example: { expectedVersion: 1, reason: Customer request }
+    ReorderRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReorderRequest' }
+    AnnouncementRequest:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AnnouncementRequest' }
+  responses:
+    NoContent:
+      description: Operación completada sin cuerpo.
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+    IngredientList:
+      description: Ingredientes públicos.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/IngredientResponse' }
+    Ingredient:
+      description: Ingrediente público.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/IngredientResponse' }
+    IngredientCreated:
+      description: Ingrediente creado.
+      headers:
+        Location: { description: URI del ingrediente, schema: { type: string, format: uri } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/IngredientResponse' }
+    IngredientAdmin:
+      description: Ingrediente con información operativa ADMIN.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/IngredientAdminResponse' }
+    Taco:
+      description: Taco publicado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoResponse' }
+    TacoCreated:
+      description: Taco publicado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoResponse' }
+    TacoDesignValidation:
+      description: Violaciones del diseño, si existen.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoDesignValidationResponse' }
+    TacoOfDay:
+      description: Taco seleccionado para el día actual.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoOfDayResponse' }
+    TacoClassification:
+      description: Clasificación de un taco.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TacoClassification' }
+    TacoRankingList:
+      description: Tacos mejor valorados.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/TacoRankingResponse' }
+    FavoritePage:
+      description: Favoritos propios con paginación.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FavoritePageResponse' }
+    PaymentMethodCreated:
+      description: Referencia de pago tokenizada sin PAN ni CVV.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaymentMethodResponse' }
+    Order:
+      description: Orden pública sin entidad User ni token de pago.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderResponse' }
+    OrderCreated:
+      description: Orden creada o respuesta conservada para el mismo Idempotency-Key.
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderResponse' }
+          example:
+            id: ORDER-ID
+            status: CREATED
+            userId: USER-ID
+            paymentBrand: VISA
+            paymentLast4: '0002'
+            currency: USD
+            subtotal: 3.00
+            couponApplied: false
+            discount: 0.00
+            total: 3.00
+            items: []
+    OrderQuote:
+      description: Cotización sin persistir la orden.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderQuoteResponse' }
+    OrderHistoryPage:
+      description: Resúmenes paginados.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderHistoryPageResponse' }
+    ReorderQuote:
+      description: Cotización de recompra.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReorderQuoteResponse' }
+    ReorderConfirm:
+      description: Orden nueva o repetición idempotente.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReorderConfirmResponse' }
+    KitchenHtml:
+      description: Interfaz de cocina.
+      content:
+        text/html:
+          schema: { type: string }
+    KitchenOrder:
+      description: Orden asignada a cocina.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/KitchenOrderResponse' }
+    KitchenOrderList:
+      description: Cola de cocina.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/KitchenOrderResponse' }
+    Announcement:
+      description: Anuncio vigente.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AnnouncementResponse' }
+    AnnouncementCreated:
+      description: Anuncio creado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AnnouncementResponse' }
+    AnnouncementList:
+      description: Anuncios vigentes.
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AnnouncementResponse' }
+    BadRequest:
+      description: Entrada inválida.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ApiProblem' }
+          example: { type: 'urn:tacocloud:problem:malformed-request', title: Bad request, status: 400, detail: The request cannot be processed., instance: /api/v1/orders, code: MALFORMED_REQUEST, violations: [] }
+    Unauthorized:
+      description: Autenticación requerida. Spring Security puede devolver un 401 sin ApiProblem.
+    Forbidden:
+      description: Operación prohibida. Spring Security puede devolver un 403 sin ApiProblem.
+    NotFound:
+      description: Recurso inexistente.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ApiProblem' }
+    Conflict:
+      description: Conflicto de estado, versión o Idempotency-Key.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ApiProblem' }
+    Unprocessable:
+      description: Regla de negocio o diseño inválido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ApiProblem' }
+  schemas:
+    IngredientType:
+      type: string
+      enum: [WRAP, BOWL, PROTEIN, VEGGIES, CHEESE, SAUCE]
+    DietaryTag:
+      type: string
+      enum: [VEGAN, VEGETARIAN, GLUTEN_FREE]
+    Allergen:
+      type: string
+      enum: [GLUTEN, MILK, EGG, SOY, PEANUTS, TREE_NUTS, FISH, SHELLFISH, SESAME]
+    SpiceLevel:
+      type: string
+      enum: [UNKNOWN, NONE, MILD, MEDIUM, HOT, EXTREME]
+    OrderStatus:
+      type: string
+      enum: [CREATED, ACCEPTED, PLACED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED, CANCELLED]
+    IngredientRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, type]
+      properties:
+        id: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+        name: { type: string, maxLength: 100, minLength: 1 }
+        type: { $ref: '#/components/schemas/IngredientType' }
+        dietaryTags:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/DietaryTag' }
+        allergens:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Allergen' }
+        spiceLevel: { $ref: '#/components/schemas/SpiceLevel' }
+    IngredientResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/IngredientType' }
+        unitPrice: { type: number, format: decimal }
+        available: { type: boolean }
+        dietaryTags:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/DietaryTag' }
+        allergens:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Allergen' }
+        spiceLevel: { $ref: '#/components/schemas/SpiceLevel' }
+    IngredientAdminResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/IngredientType' }
+        unitPrice: { type: number, format: decimal }
+        available: { type: boolean }
+        stockOnHand: { type: integer, minimum: 0 }
+        reorderLevel: { type: integer, minimum: 0 }
+        version: { type: integer, format: int64 }
+        dietaryTags:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/DietaryTag' }
+        allergens:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Allergen' }
+        spiceLevel: { $ref: '#/components/schemas/SpiceLevel' }
+    IngredientCatalogUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        unitPrice: { type: number, format: decimal, minimum: 0 }
+        available: { type: boolean }
+        reorderLevel: { type: integer, minimum: 0 }
+    StockAdjustmentRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, adjustment]
+      properties:
+        expectedVersion: { type: integer, format: int64, minimum: 0 }
+        adjustment: { type: integer }
+    TacoIngredientId:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+    TacoCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, ingredients]
+      properties:
+        name: { type: string, minLength: 5, maxLength: 100 }
+        ingredients:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/TacoIngredientId' }
+    TacoClassification:
+      type: object
+      additionalProperties: false
+      properties:
+        tacoId: { type: string, nullable: true }
+        dietaryTags:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/DietaryTag' }
+        allergens:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Allergen' }
+        spiceLevel: { $ref: '#/components/schemas/SpiceLevel' }
+        disclaimer: { type: string }
+    TacoResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+        ingredients:
+          type: array
+          items: { $ref: '#/components/schemas/IngredientResponse' }
+        classification: { $ref: '#/components/schemas/TacoClassification' }
+    TacoSearchResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/TacoResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    TacoDesignViolation:
+      type: object
+      additionalProperties: false
+      properties:
+        code: { type: string }
+        message: { type: string }
+    TacoDesignValidationResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        valid: { type: boolean }
+        violations:
+          type: array
+          items: { $ref: '#/components/schemas/TacoDesignViolation' }
+    TacoOfDayResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        taco: { $ref: '#/components/schemas/TacoResponse' }
+        date: { type: string, format: date }
+        reason: { type: string }
+    TacoRatingRequest:
+      type: object
+      additionalProperties: false
+      required: [score]
+      properties:
+        score: { type: integer, minimum: 1, maximum: 5 }
+    TacoRankingResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        tacoId: { type: string }
+        tacoName: { type: string }
+        average: { type: number, format: decimal }
+        count: { type: integer, format: int64 }
+        distribution:
+          type: array
+          items: { type: integer, format: int64 }
+    FavoriteResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        tacoId: { type: string }
+        tacoName: { type: string }
+        orphaned: { type: boolean }
+    FavoritePageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/FavoriteResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    PaymentTokenizeRequest:
+      type: object
+      additionalProperties: false
+      required: [pan, expiration, cvv]
+      properties:
+        pan: { type: string, writeOnly: true, pattern: '^[0-9]{12,19}$' }
+        expiration: { type: string, pattern: '^(0[1-9]|1[0-2])/[0-9]{2}$' }
+        cvv: { type: string, writeOnly: true, pattern: '^[0-9]{3,4}$' }
+    PaymentMethodResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        paymentMethodId: { type: string }
+        brand: { type: string }
+        last4: { type: string, pattern: '^[0-9]{4}$' }
+    OrderCreateTaco:
+      type: object
+      additionalProperties: false
+      required: [name, ingredientIds]
+      properties:
+        name: { type: string, minLength: 5, maxLength: 100 }
+        ingredientIds:
+          type: array
+          maxItems: 50
+          items: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+    OrderCreateItem:
+      type: object
+      additionalProperties: false
+      required: [taco, quantity]
+      properties:
+        taco: { $ref: '#/components/schemas/OrderCreateTaco' }
+        quantity: { type: integer, minimum: 1 }
+    OrderCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [deliveryName, deliveryStreet, deliveryCity, deliveryState, deliveryZip, paymentMethodId, items]
+      properties:
+        deliveryName: { type: string, minLength: 1, maxLength: 100 }
+        deliveryStreet: { type: string, minLength: 1, maxLength: 150 }
+        deliveryCity: { type: string, minLength: 1, maxLength: 100 }
+        deliveryState: { type: string, minLength: 1, maxLength: 50 }
+        deliveryZip: { type: string, pattern: '^[A-Za-z0-9 -]{3,20}$' }
+        paymentMethodId: { type: string, maxLength: 64 }
+        couponCode: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/OrderCreateItem' }
+    OrderResponseTaco:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string, nullable: true }
+        name: { type: string }
+        ingredientIds:
+          type: array
+          items: { type: string }
+    OrderResponseItem:
+      type: object
+      additionalProperties: false
+      properties:
+        taco: { $ref: '#/components/schemas/OrderResponseTaco' }
+        quantity: { type: integer, minimum: 1 }
+        unitPriceAtPurchase: { type: number, format: decimal }
+        subtotal: { type: number, format: decimal }
+    OrderStatusChange:
+      type: object
+      additionalProperties: false
+      properties:
+        from: { $ref: '#/components/schemas/OrderStatus' }
+        to: { $ref: '#/components/schemas/OrderStatus' }
+        actorId: { type: string }
+        actorRole: { type: string }
+        changedAt: { type: string, format: date-time }
+        origin: { type: string }
+        reason: { type: string }
+    OrderResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        placedAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        version: { type: integer, format: int64 }
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/OrderStatusChange' }
+        userId: { type: string }
+        deliveryName: { type: string }
+        deliveryStreet: { type: string }
+        deliveryCity: { type: string }
+        deliveryState: { type: string }
+        deliveryZip: { type: string }
+        paymentBrand: { type: string }
+        paymentLast4: { type: string }
+        currency: { type: string }
+        subtotal: { type: number, format: decimal }
+        couponApplied: { type: boolean }
+        discount: { type: number, format: decimal }
+        total: { type: number, format: decimal }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderResponseItem' }
+    EmailTaco:
+      type: object
+      additionalProperties: false
+      required: [name, ingredients]
+      properties:
+        name: { type: string, minLength: 5, maxLength: 100 }
+        ingredients:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string, maxLength: 64 }
+    EmailOrder:
+      type: object
+      additionalProperties: false
+      required: [email, tacos]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        tacos:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/EmailTaco' }
+    OrderQuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [subtotal, couponCode]
+      properties:
+        subtotal: { type: number, format: decimal, minimum: 0 }
+        couponCode: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+        tacoId: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+        taco: { $ref: '#/components/schemas/TacoCreateRequest' }
+    OrderQuoteResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        currency: { type: string }
+        subtotal: { type: number, format: decimal }
+        discount: { type: number, format: decimal }
+        total: { type: number, format: decimal }
+        couponApplied: { type: boolean }
+        classification: { $ref: '#/components/schemas/TacoClassification' }
+    OrderPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        deliveryName: { type: string, maxLength: 100 }
+        deliveryStreet: { type: string, maxLength: 150 }
+        deliveryCity: { type: string, maxLength: 100 }
+        deliveryState: { type: string, maxLength: 50 }
+        deliveryZip: { type: string, maxLength: 20 }
+    OrderReplaceRequest:
+      type: object
+      additionalProperties: false
+      required: [deliveryName, deliveryStreet, deliveryCity, deliveryState, deliveryZip]
+      properties:
+        deliveryName: { type: string, minLength: 1, maxLength: 100 }
+        deliveryStreet: { type: string, minLength: 1, maxLength: 150 }
+        deliveryCity: { type: string, minLength: 1, maxLength: 100 }
+        deliveryState: { type: string, minLength: 1, maxLength: 50 }
+        deliveryZip: { type: string, minLength: 1, maxLength: 20 }
+    OrderStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status, expectedVersion, reason]
+      properties:
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        expectedVersion: { type: integer, format: int64 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    OrderCancelRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: { type: integer, format: int64 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    OrderSummaryResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        placedAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        total: { type: number, format: decimal }
+        currency: { type: string }
+    OrderHistoryPageResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/OrderSummaryResponse' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer, format: int64 }
+    ReorderRequest:
+      type: object
+      additionalProperties: false
+      required: [paymentMethodId]
+      properties:
+        paymentMethodId: { type: string, maxLength: 64 }
+        couponCode: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+        quoteFingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
+    IngredientDifference:
+      type: object
+      additionalProperties: false
+      properties:
+        ingredientId: { type: string }
+        previousName: { type: string }
+        currentName: { type: string }
+        previousUnitPrice: { type: number, format: decimal }
+        currentUnitPrice: { type: number, format: decimal }
+        metadataChanged: { type: boolean }
+    ReorderQuoteResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        sourceOrderId: { type: string }
+        currency: { type: string }
+        originalSubtotal: { type: number, format: decimal }
+        quotedSubtotal: { type: number, format: decimal }
+        originalTotal: { type: number, format: decimal }
+        quotedTotal: { type: number, format: decimal }
+        priceDifference: { type: number, format: decimal }
+        couponApplied: { type: boolean }
+        ingredientDifferences:
+          type: array
+          items: { $ref: '#/components/schemas/IngredientDifference' }
+        quoteFingerprint: { type: string }
+        confirmationRequired: { type: boolean }
+    ReorderConfirmResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        order: { $ref: '#/components/schemas/OrderResponse' }
+        replayed: { type: boolean }
+    KitchenOrderItem:
+      type: object
+      additionalProperties: false
+      properties:
+        tacoName: { type: string }
+        quantity: { type: integer }
+        ingredientIds:
+          type: array
+          items: { type: string }
+        ingredientNames:
+          type: array
+          items: { type: string }
+    KitchenOrderResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        placedAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        version: { type: integer, format: int64 }
+        stationId: { type: string }
+        cookId: { type: string }
+        estimatedPrepMinutes: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/KitchenOrderItem' }
+    AnnouncementRequest:
+      type: object
+      additionalProperties: false
+      required: [text, severity, expiresAt]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 500 }
+        severity: { type: string, enum: [INFO, WARNING, CRITICAL] }
+        expiresAt: { type: string, format: date-time }
+    AnnouncementResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        text: { type: string }
+        severity: { type: string, enum: [INFO, WARNING, CRITICAL] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        active: { type: boolean }
+    ApiProblemViolation:
+      type: object
+      additionalProperties: false
+      properties:
+        field: { type: string }
+        message: { type: string }
+        code: { type: string, nullable: true }
+    ApiProblem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, instance, code, violations]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        violations:
+          type: array
+          items: { $ref: '#/components/schemas/ApiProblemViolation' }

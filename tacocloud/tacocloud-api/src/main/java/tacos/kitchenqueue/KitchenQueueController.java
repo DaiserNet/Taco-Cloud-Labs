@@ -18,7 +18,7 @@ import tacos.api.dto.KitchenOrderResponse;
 import tacos.api.dto.OrderStatusRequest;
 
 @RestController
-@RequestMapping(path = "/api/kitchen", produces = "application/json")
+@RequestMapping(path = {"/api/kitchen", "/api/v1/kitchen"}, produces = "application/json")
 public class KitchenQueueController {
   private final KitchenQueueService queue;
 

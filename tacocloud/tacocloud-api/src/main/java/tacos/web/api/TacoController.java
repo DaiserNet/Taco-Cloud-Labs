@@ -33,7 +33,7 @@ import tacos.search.TacoSearchService;
 import tacos.recommendation.TacoOfDayService;
 
 @RestController
-@RequestMapping(path = "/api/tacos", produces = "application/json")
+@RequestMapping(path = {"/api/tacos", "/api/v1/tacos"}, produces = "application/json")
 public class TacoController {
   private final TacoRepository tacoRepo;
   private final TacoClassificationService classificationService;

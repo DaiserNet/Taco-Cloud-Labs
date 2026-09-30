@@ -2,6 +2,8 @@ package tacos.web.api;
 
 import java.net.URI;
 
+import javax.servlet.http.HttpServletRequest;
+
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +32,7 @@ import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 @RestController
-@RequestMapping(path="/api/ingredients", produces="application/json")
+@RequestMapping(path={"/api/ingredients", "/api/v1/ingredients"}, produces="application/json")
 public class IngredientController {
 
   private IngredientRepository repo;
@@ -72,11 +74,14 @@ public class IngredientController {
 
   @PostMapping
   public Mono<ResponseEntity<IngredientResponse>> postIngredient(
-      @Valid @RequestBody IngredientRequest request, UriComponentsBuilder uriBuilder) {
+      @Valid @RequestBody IngredientRequest request, UriComponentsBuilder uriBuilder,
+      HttpServletRequest servletRequest) {
     return repo.save(ingredientMapper.toEntity(request))
         .map(ingredient -> {
+          String path = servletRequest.getRequestURI().startsWith("/api/v1/")
+              ? "/api/v1/ingredients/{id}" : "/api/ingredients/{id}";
           URI location = uriBuilder
-              .path("/api/ingredients/{id}")
+              .path(path)
               .buildAndExpand(ingredient.getId())
               .toUri();
           return ResponseEntity.created(location)

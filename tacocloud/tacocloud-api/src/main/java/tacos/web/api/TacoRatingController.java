@@ -20,7 +20,7 @@ import tacos.api.dto.TacoRatingRequest;
 import tacos.ratings.TacoRatingService;
 
 @RestController
-@RequestMapping(path = "/api/tacos", produces = "application/json")
+@RequestMapping(path = {"/api/tacos", "/api/v1/tacos"}, produces = "application/json")
 public class TacoRatingController {
   private final TacoRatingService ratingService;
 

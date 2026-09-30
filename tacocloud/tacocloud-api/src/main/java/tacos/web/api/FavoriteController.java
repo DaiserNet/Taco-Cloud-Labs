@@ -16,7 +16,7 @@ import tacos.api.dto.FavoritePageResponse;
 import tacos.favorites.FavoriteService;
 
 @RestController
-@RequestMapping(path = "/api/users/me/favorites", produces = "application/json")
+@RequestMapping(path = {"/api/users/me/favorites", "/api/v1/users/me/favorites"}, produces = "application/json")
 public class FavoriteController {
   private final FavoriteService favoriteService;
 

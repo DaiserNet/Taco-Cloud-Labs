@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class KitchenUI {
-  @GetMapping(path = "/api/kitchen/ui", produces = MediaType.TEXT_HTML_VALUE)
+  @GetMapping(path = {"/api/kitchen/ui", "/api/v1/kitchen/ui"},
+      produces = MediaType.TEXT_HTML_VALUE)
   public ResponseEntity<Resource> display(HttpServletRequest request) {
     CsrfToken csrfToken = (CsrfToken) request.getAttribute(
         CsrfToken.class.getName());

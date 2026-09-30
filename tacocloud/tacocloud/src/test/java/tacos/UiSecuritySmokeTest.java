@@ -37,6 +37,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.util.StreamUtils;
 
 import reactor.core.publisher.Flux;
@@ -236,10 +237,9 @@ class UiSecuritySmokeTest {
             .contentType(MediaType.APPLICATION_JSON).content(payment))
         .andExpect(status().isForbidden());
 
-    Cookie csrf = csrfCookie();
     MvcResult tokenized = mvc.perform(post("/api/payment-methods/tokenize")
             .header(HttpHeaders.AUTHORIZATION, basicHabuma())
-            .cookie(csrf).header("X-XSRF-TOKEN", csrf.getValue())
+            .with(csrf())
             .contentType(MediaType.APPLICATION_JSON).content(payment))
         .andExpect(request().asyncStarted()).andReturn();
     String response = mvc.perform(asyncDispatch(tokenized))
@@ -249,10 +249,47 @@ class UiSecuritySmokeTest {
     assertFalse(response.contains("4111111111111111"));
   }
 
+  @Test
+  void shouldServeV1AndDeprecateLegacyWithoutChangingRolesOrCsrf()
+      throws Exception {
+    mvc.perform(get("/openapi.yaml"))
+        .andExpect(status().isOk());
+    MvcResult publicV1 = mvc.perform(get("/api/v1/ingredients"))
+        .andExpect(request().asyncStarted()).andReturn();
+    mvc.perform(asyncDispatch(publicV1)).andExpect(status().isOk());
+    MvcResult legacy = mvc.perform(get("/api/ingredients"))
+        .andExpect(request().asyncStarted()).andReturn();
+    mvc.perform(asyncDispatch(legacy)).andExpect(status().isOk())
+        .andExpect(org.springframework.test.web.servlet.result
+            .MockMvcResultMatchers.header().string("Deprecation", "true"))
+        .andExpect(org.springframework.test.web.servlet.result
+            .MockMvcResultMatchers.header().string("Link",
+                "</api/v1/ingredients>; rel=\"successor-version\""));
+    mvc.perform(get("/api/v1/admin/orders")
+            .with(user("habuma").roles("USER")))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/v1/tacos")
+            .with(user("habuma").roles("USER")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/v1/orders")
+            .with(user("habuma").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/v1/orders")
+            .with(user("habuma").roles("USER")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isUnprocessableEntity());
+    mvc.perform(get("/api/v1/new-undeclared-path")
+            .with(user("habuma").roles("USER")))
+        .andExpect(status().isForbidden());
+  }
+
   private Cookie csrfCookie() throws Exception {
-    Cookie csrf = mvc.perform(get("/"))
+    MvcResult result = mvc.perform(get("/").session(new MockHttpSession()))
         .andExpect(status().isOk())
-        .andReturn().getResponse().getCookie("XSRF-TOKEN");
+        .andReturn();
+    Cookie csrf = result.getResponse().getCookie("XSRF-TOKEN");
     assertNotNull(csrf);
     assertFalse(csrf.isHttpOnly());
     return csrf;

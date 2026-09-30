@@ -17,7 +17,7 @@ import tacos.payment.PaymentMethodService;
 import tacos.payment.PaymentTokenizationCommand;
 
 @RestController
-@RequestMapping(path = "/api/payment-methods", produces = "application/json")
+@RequestMapping(path = {"/api/payment-methods", "/api/v1/payment-methods"}, produces = "application/json")
 public class PaymentMethodController {
 
   private final PaymentMethodService paymentMethodService;

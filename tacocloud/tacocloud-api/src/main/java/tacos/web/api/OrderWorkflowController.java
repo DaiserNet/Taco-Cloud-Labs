@@ -18,7 +18,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.workflow.OrderWorkflowService;
 
 @RestController
-@RequestMapping(path = "/api/orders/{orderId}", produces = "application/json")
+@RequestMapping(path = {"/api/orders/{orderId}", "/api/v1/orders/{orderId}"}, produces = "application/json")
 public class OrderWorkflowController {
   private final OrderWorkflowService workflow;
   private final OrderMapper mapper;

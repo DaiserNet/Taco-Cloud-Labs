@@ -17,7 +17,7 @@ import tacos.api.mapper.IngredientMapper;
 import tacos.catalog.IngredientCatalogService;
 
 @RestController
-@RequestMapping(path = "/api/admin/ingredients", produces = "application/json")
+@RequestMapping(path = {"/api/admin/ingredients", "/api/v1/admin/ingredients"}, produces = "application/json")
 public class IngredientAdminController {
 
   private final IngredientCatalogService catalogService;

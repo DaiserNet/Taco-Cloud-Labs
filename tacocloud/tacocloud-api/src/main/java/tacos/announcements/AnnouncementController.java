@@ -15,7 +15,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping(path = "/api/admin/announcements", produces = "application/json")
+@RequestMapping(path = {"/api/admin/announcements", "/api/v1/admin/announcements"}, produces = "application/json")
 public class AnnouncementController {
   private final AnnouncementService announcements;
 

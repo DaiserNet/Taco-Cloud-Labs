@@ -22,7 +22,7 @@ public class OrderHistoryController {
     this.history = history;
   }
 
-  @GetMapping("/api/orders/me")
+  @GetMapping({"/api/orders/me", "/api/v1/orders/me"})
   public Mono<OrderHistoryPageResponse> myOrders(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "10") int size,
@@ -30,13 +30,13 @@ public class OrderHistoryController {
     return history.myOrders(page, size, authentication);
   }
 
-  @GetMapping("/api/orders/me/{id}")
+  @GetMapping({"/api/orders/me/{id}", "/api/v1/orders/me/{id}"})
   public Mono<OrderResponse> myOrder(@PathVariable String id,
       Authentication authentication) {
     return history.myOrder(id, authentication);
   }
 
-  @GetMapping("/api/admin/orders")
+  @GetMapping({"/api/admin/orders", "/api/v1/admin/orders"})
   public Mono<OrderHistoryPageResponse> adminOrders(
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "10") int size,
@@ -46,7 +46,7 @@ public class OrderHistoryController {
     return history.adminOrders(page, size, userId, status, authentication);
   }
 
-  @GetMapping("/api/admin/orders/{id}")
+  @GetMapping({"/api/admin/orders/{id}", "/api/v1/admin/orders/{id}"})
   public Mono<OrderResponse> adminOrder(@PathVariable String id,
       Authentication authentication) {
     return history.adminOrder(id, authentication);

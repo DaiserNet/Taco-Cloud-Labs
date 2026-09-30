@@ -20,7 +20,8 @@ import tacos.correlation.CorrelationContext;
 import tacos.reorder.ReorderService;
 
 @RestController
-@RequestMapping(path = "/api/orders/me/{sourceOrderId}/reorder",
+@RequestMapping(path = {"/api/orders/me/{sourceOrderId}/reorder",
+    "/api/v1/orders/me/{sourceOrderId}/reorder"},
     produces = "application/json")
 public class ReorderController {
   private final ReorderService reorders;

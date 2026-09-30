@@ -25,7 +25,7 @@ import tacos.correlation.CorrelationContext;
 import tacos.idempotency.OrderIdempotencyService;
 
 @RestController
-@RequestMapping(path = "/api/orders", produces = "application/json")
+@RequestMapping(path = {"/api/orders", "/api/v1/orders"}, produces = "application/json")
 public class OrderApiController {
 
   private final OrderService orderService;
