@@ -1,0 +1,35 @@
+name: TC-36 integration gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+          cache-dependency-path: tacocloud/pom.xml
+      - name: Check container runtime
+        run: docker info
+      - name: Build and test all Maven modules
+        working-directory: tacocloud
+        run: mvn -U -B clean test -Dmaven.test.redirectTestOutputToFile=true
+      - name: Test Angular client
+        working-directory: tacocloud/tacocloud-ui
+        run: ./node/node ./node_modules/@angular/cli/bin/ng test --watch=false --browsers=ChromeHeadlessCI
+      - name: Verify required suites and skipped tests
+        if: always()
+        run: python3 scripts/verify_tc36_reports.py tacocloud
+      - name: Preserve Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: tacocloud/*/target/surefire-reports/

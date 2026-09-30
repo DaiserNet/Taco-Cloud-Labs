@@ -1,6 +1,7 @@
 package tacos.web.api;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.EnumSet;
 
 import org.mockito.Mockito;
@@ -10,6 +11,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
 import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
+import reactor.test.publisher.TestPublisher;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
 import tacos.Allergen;
@@ -128,6 +130,24 @@ public class IngredientControllerTest {
             .expectStatus().isNoContent();
         Mockito.verify(repo, Mockito.times(1)).delete(Mockito.any(Ingredient.class));
         
+    }
+
+    @Test
+    public void shouldWaitForIngredientDeletePublisherBeforeNoContent() {
+        Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla",
+            Ingredient.Type.WRAP);
+        TestPublisher<Void> deletion = TestPublisher.createCold();
+        PublisherProbe<Void> probe = PublisherProbe.of(deletion.mono());
+        Mockito.when(repo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+        Mockito.when(repo.delete(ingredient)).thenReturn(probe.mono());
+
+        StepVerifier.create(controller.deleteIngredient("FLTO"))
+            .expectSubscription()
+            .then(probe::assertWasSubscribed)
+            .expectNoEvent(Duration.ofMillis(20))
+            .then(deletion::complete)
+            .expectNextMatches(response -> response.getStatusCodeValue() == 204)
+            .verifyComplete();
     }
 
     @Test
