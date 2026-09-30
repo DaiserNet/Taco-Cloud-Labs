@@ -6,19 +6,23 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.UUID;
 
 import javax.servlet.http.Cookie;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -26,6 +30,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,6 +40,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.util.StreamUtils;
 
 import reactor.core.publisher.Flux;
+import tacos.announcements.OpsAnnouncement;
 import tacos.data.UserRepository;
 import tacos.correlation.CorrelationIdFilter;
 import tacos.outbox.OutboxHealthIndicator;
@@ -58,6 +65,60 @@ class UiSecuritySmokeTest {
 
   @Autowired
   private OutboxHealthIndicator outboxHealth;
+
+  @Autowired
+  private ReactiveMongoTemplate mongo;
+
+  @Autowired
+  private ObjectMapper json;
+
+  @Test
+  void shouldKeepAnnouncementsAdminOnlyWithCsrfAndHideAuthor() throws Exception {
+    mongo.remove(new Query(), OpsAnnouncement.class).then().toFuture()
+        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+    String body = "{\"text\":\"Scheduled maintenance\","
+        + "\"severity\":\"WARNING\",\"expiresAt\":\""
+        + Instant.now().plusSeconds(3600) + "\"}";
+    mvc.perform(get("/api/admin/announcements"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/admin/announcements")
+            .with(user("customer").roles("USER")))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/admin/announcements")
+            .with(user("customer").roles("USER")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isForbidden());
+    mvc.perform(post("/api/admin/announcements")
+            .with(user("admin").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isForbidden());
+    String spoofedAuthor = body.substring(0, body.length() - 1)
+        + ",\"createdBy\":\"customer\"}";
+    mvc.perform(post("/api/admin/announcements")
+            .with(user("admin").roles("ADMIN")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(spoofedAuthor))
+        .andExpect(status().isBadRequest());
+
+    MvcResult started = mvc.perform(post("/api/admin/announcements")
+            .with(user("admin").roles("ADMIN")).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(request().asyncStarted()).andReturn();
+    String created = mvc.perform(asyncDispatch(started))
+        .andExpect(status().isCreated()).andReturn()
+        .getResponse().getContentAsString();
+    assertFalse(created.contains("createdBy"));
+    assertFalse(created.contains("slot"));
+    String id = json.readTree(created).get("id").asText();
+
+    MvcResult listing = mvc.perform(get("/api/admin/announcements")
+            .with(user("admin").roles("ADMIN")))
+        .andExpect(request().asyncStarted()).andReturn();
+    mvc.perform(asyncDispatch(listing)).andExpect(status().isOk());
+    MvcResult removed = mvc.perform(delete("/api/admin/announcements/" + id)
+            .with(user("admin").roles("ADMIN")).with(csrf()))
+        .andExpect(request().asyncStarted()).andReturn();
+    mvc.perform(asyncDispatch(removed)).andExpect(status().isNoContent());
+  }
 
   @Test
   void shouldExposeProbesAndRestrictActualMetricsEndpoint() throws Exception {

@@ -108,6 +108,10 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  announcements:
+    max-active: ${TACOCLOUD_ANNOUNCEMENTS_MAX_ACTIVE:20}
+    max-text-length: ${TACOCLOUD_ANNOUNCEMENTS_MAX_TEXT_LENGTH:500}
+    max-lifetime-hours: ${TACOCLOUD_ANNOUNCEMENTS_MAX_LIFETIME_HOURS:168}
   outbox:
     batch-size: ${TACOCLOUD_OUTBOX_BATCH_SIZE:50}
     max-attempts: ${TACOCLOUD_OUTBOX_MAX_ATTEMPTS:10}
