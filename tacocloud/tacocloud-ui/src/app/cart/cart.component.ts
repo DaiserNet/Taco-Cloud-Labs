@@ -2,6 +2,8 @@ import { Component, OnInit, Injectable } from '@angular/core';
 import { CartService } from './cart-service';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import 'rxjs/add/operator/switchMap';
+import { Observable } from 'rxjs/Observable';
+import 'rxjs/add/observable/of';
 
 @Component({
   selector: 'taco-cart',
@@ -28,6 +30,11 @@ export class CartComponent implements OnInit {
     cvv: ''
   };
 
+  private submitting = false;
+  private pendingKey: string;
+  private pendingRequest: string;
+  private pendingPaymentMethodId: string;
+
   constructor(private cart: CartService, private httpClient: HttpClient) {
     this.cart = cart;
   }
@@ -43,7 +50,10 @@ export class CartComponent implements OnInit {
   }
 
   onSubmit() {
-    this.model.items = this.cart.getItemsInCart()
+    if (this.submitting) {
+      return;
+    }
+    const items = this.cart.getItemsInCart()
         .filter(cartItem => Number(cartItem.quantity) > 0)
         .map(cartItem => ({
           taco: {
@@ -54,19 +64,44 @@ export class CartComponent implements OnInit {
           quantity: Number(cartItem.quantity)
         }));
 
-    this.httpClient.post<any>(
+    const request = Object.assign({}, this.model, {items});
+    const requestIdentity = JSON.stringify({request, payment: this.payment});
+    if (requestIdentity !== this.pendingRequest) {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      this.pendingKey = Array.from(bytes)
+          .map(value => ('0' + value.toString(16)).slice(-2)).join('');
+      this.pendingRequest = requestIdentity;
+      this.pendingPaymentMethodId = null;
+    }
+    this.submitting = true;
+
+    const paymentRequest = this.pendingPaymentMethodId
+        ? Observable.of({paymentMethodId: this.pendingPaymentMethodId})
+        : this.httpClient.post<any>(
         '/api/payment-methods/tokenize',
         this.payment, {
             headers: new HttpHeaders().set('Content-type', 'application/json')
                     .set('Accept', 'application/json'),
-        }).switchMap(paymentMethod => {
-          this.model.paymentMethodId = paymentMethod.paymentMethodId;
+        });
+    paymentRequest.switchMap(paymentMethod => {
+          this.pendingPaymentMethodId = paymentMethod.paymentMethodId;
+          request.paymentMethodId = paymentMethod.paymentMethodId;
           return this.httpClient.post(
-              '/api/orders', this.model, {
+              '/api/orders', request, {
                 headers: new HttpHeaders().set('Content-type', 'application/json')
                         .set('Accept', 'application/json')
+                        .set('Idempotency-Key', this.pendingKey)
               });
-        }).subscribe(r => this.cart.emptyCart());
+        }).subscribe(r => {
+          this.cart.emptyCart();
+          this.pendingKey = null;
+          this.pendingRequest = null;
+          this.pendingPaymentMethodId = null;
+          this.submitting = false;
+        }, error => {
+          this.submitting = false;
+        });
 
     // TODO: Do something after this...navigate to a thank you page or something
   }

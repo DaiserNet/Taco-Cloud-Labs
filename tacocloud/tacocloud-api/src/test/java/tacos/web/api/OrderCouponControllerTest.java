@@ -98,7 +98,8 @@ class OrderCouponControllerTest {
         couponService, inventoryService, new tacos.observability.OrderMetrics(
             metricsRegistry, "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
-        new OrderApiController(orderService, new OrderMapper()))
+        new OrderApiController(orderService, new OrderMapper(),
+            mock(tacos.idempotency.OrderIdempotencyService.class)))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }

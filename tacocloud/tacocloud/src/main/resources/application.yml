@@ -108,6 +108,9 @@ info:
 #end::contactInfo[]
 
 tacocloud:
+  order-idempotency:
+    retention-hours: ${TACOCLOUD_ORDER_IDEMPOTENCY_RETENTION_HOURS:24}
+    wait-millis: ${TACOCLOUD_ORDER_IDEMPOTENCY_WAIT_MILLIS:5000}
   announcements:
     max-active: ${TACOCLOUD_ANNOUNCEMENTS_MAX_ACTIVE:20}
     max-text-length: ${TACOCLOUD_ANNOUNCEMENTS_MAX_TEXT_LENGTH:500}

@@ -5,6 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import java.util.function.Function;
+
 import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
 import tacos.data.OrderRepository;
@@ -26,6 +28,17 @@ public final class OrderOutboxTestSupport {
           return orders.save(order)
               .flatMap(saved -> inventory.accept(reservation.getId(),
                   saved.getId()).thenReturn(saved));
+        }));
+    lenient().when(outbox.saveAcceptedOrder(any(TacoOrder.class),
+        any(InventoryReservation.class), any(Function.class)))
+        .thenAnswer(call -> Mono.defer(() -> {
+          TacoOrder order = call.getArgument(0);
+          InventoryReservation reservation = call.getArgument(1);
+          Function<TacoOrder, Mono<Void>> afterOutbox = call.getArgument(2);
+          return orders.save(order)
+              .flatMap(saved -> inventory.accept(reservation.getId(),
+                  saved.getId()).thenReturn(saved))
+              .flatMap(saved -> afterOutbox.apply(saved).thenReturn(saved));
         }));
     return outbox;
   }

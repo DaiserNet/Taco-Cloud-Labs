@@ -86,7 +86,8 @@ class OrderPutDeleteControllerTest {
         org.mockito.Mockito.mock(CouponService.class), inventoryService,
         new tacos.observability.OrderMetrics(
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
-    controller = new OrderApiController(orderService, new OrderMapper());
+    controller = new OrderApiController(orderService, new OrderMapper(),
+        org.mockito.Mockito.mock(tacos.idempotency.OrderIdempotencyService.class));
   }
 
   @Test

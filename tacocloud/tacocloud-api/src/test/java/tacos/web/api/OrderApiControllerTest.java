@@ -41,6 +41,7 @@ import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.inventory.InventoryService;
+import tacos.idempotency.OrderIdempotencyService;
 import tacos.messaging.OrderMessagingService;
 import tacos.observability.OrderMetrics;
 import tacos.payment.PaymentMethodService;
@@ -91,6 +92,9 @@ public class OrderApiControllerTest {
 
     @MockBean
     private OrderMetrics orderMetrics;
+
+    @MockBean
+    private OrderIdempotencyService idempotency;
 
     @Test 
     public void shouldPatchZipWithoutChangingState() {

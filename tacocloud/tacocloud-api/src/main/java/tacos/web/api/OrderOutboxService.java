@@ -2,6 +2,7 @@ package tacos.web.api;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,6 +42,12 @@ public class OrderOutboxService {
 
   public Mono<TacoOrder> saveAcceptedOrder(
       TacoOrder order, InventoryReservation reservation) {
+    return saveAcceptedOrder(order, reservation, saved -> Mono.empty());
+  }
+
+  public Mono<TacoOrder> saveAcceptedOrder(
+      TacoOrder order, InventoryReservation reservation,
+      Function<TacoOrder, Mono<Void>> afterOutbox) {
     return Mono.defer(() -> orders.save(order))
         .flatMap(saved -> inventory.accept(reservation.getId(), saved.getId())
             .then(Mono.deferContextual(context -> {
@@ -52,6 +59,8 @@ public class OrderOutboxService {
                   .doOnSuccess(ignored -> logStaged(event))
                   .thenReturn(saved);
             })))
+        .flatMap(saved -> Mono.defer(() -> afterOutbox.apply(saved))
+            .thenReturn(saved))
         .as(transaction::transactional);
   }
 

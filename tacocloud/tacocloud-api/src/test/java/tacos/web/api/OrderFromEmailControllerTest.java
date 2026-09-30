@@ -85,7 +85,8 @@ class OrderFromEmailControllerTest {
         mock(tacos.payment.PaymentMethodService.class), orderPricingService,
         couponService, inventoryService, new tacos.observability.OrderMetrics(
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
-    controller = new OrderApiController(orderService, new OrderMapper());
+    controller = new OrderApiController(orderService, new OrderMapper(),
+        mock(tacos.idempotency.OrderIdempotencyService.class));
   }
 
   @Test

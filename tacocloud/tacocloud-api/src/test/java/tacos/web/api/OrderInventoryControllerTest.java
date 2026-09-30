@@ -96,7 +96,8 @@ class OrderInventoryControllerTest {
         pricingService, couponService, inventoryService,
         new tacos.observability.OrderMetrics(metricsRegistry, "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
-        new OrderApiController(orderService, new OrderMapper()))
+        new OrderApiController(orderService, new OrderMapper(),
+            mock(tacos.idempotency.OrderIdempotencyService.class)))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }
@@ -172,7 +173,7 @@ class OrderInventoryControllerTest {
     TacoOrder order = requestedOrder();
     prepareOwnerAndPayment();
     when(inventoryService.reserve(order)).thenReturn(Mono.just(reservation));
-    when(outbox.saveAcceptedOrder(order, reservation))
+    when(outbox.saveAcceptedOrder(eq(order), eq(reservation), any()))
         .thenReturn(Mono.error(new IllegalStateException("outbox failed")));
 
     StepVerifier.create(orderService.createOrder(order, user()))

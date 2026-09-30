@@ -77,7 +77,7 @@ class ApiProblemControllerTest {
         mock(InventoryService.class), new tacos.observability.OrderMetrics(
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
     OrderApiController orderController = new OrderApiController(
-        orderService, new OrderMapper());
+        orderService, new OrderMapper(), mock(tacos.idempotency.OrderIdempotencyService.class));
     mvc = MockMvcBuilders.standaloneSetup(
         orderController, new IngredientController(ingredientRepo, new IngredientMapper()),
         new RegistrationController(registrationService))

@@ -89,7 +89,8 @@ class OrderPricingControllerTest {
         couponService, inventoryService, new tacos.observability.OrderMetrics(
             new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
-        new OrderApiController(orderService, new OrderMapper()))
+        new OrderApiController(orderService, new OrderMapper(),
+            mock(tacos.idempotency.OrderIdempotencyService.class)))
         .setControllerAdvice(new ApiExceptionHandler())
         .build();
   }

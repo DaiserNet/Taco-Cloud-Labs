@@ -72,6 +72,14 @@ public class OrderService {
   public Mono<TacoOrder> createOrder(TacoOrder order,
       Authentication authentication,
       Function<TacoOrder, Mono<Void>> beforeReservation, String origin) {
+    return createOrder(order, authentication, beforeReservation, origin,
+        saved -> Mono.empty());
+  }
+
+  public Mono<TacoOrder> createOrder(TacoOrder order,
+      Authentication authentication,
+      Function<TacoOrder, Mono<Void>> beforeReservation, String origin,
+      Function<TacoOrder, Mono<Void>> afterOutbox) {
     return metrics.placement(currentUser(authentication)
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
@@ -84,7 +92,7 @@ public class OrderService {
                   return Mono.defer(() -> beforeReservation.apply(pricedOrder))
                       .then(Mono.defer(() -> {
                         initializeLifecycle(pricedOrder, authentication, origin);
-                        return reserveSaveAndAccept(pricedOrder);
+                        return reserveSaveAndAccept(pricedOrder, afterOutbox);
                       }));
                 }))), origin);
   }
@@ -155,13 +163,19 @@ public class OrderService {
   }
 
   private Mono<TacoOrder> reserveSaveAndAccept(TacoOrder order) {
+    return reserveSaveAndAccept(order, saved -> Mono.empty());
+  }
+
+  private Mono<TacoOrder> reserveSaveAndAccept(TacoOrder order,
+      Function<TacoOrder, Mono<Void>> afterOutbox) {
     return inventoryService.reserve(order)
-        .flatMap(reservation -> saveReservedOrder(order, reservation));
+        .flatMap(reservation -> saveReservedOrder(order, reservation, afterOutbox));
   }
 
   private Mono<TacoOrder> saveReservedOrder(
-      TacoOrder order, InventoryReservation reservation) {
-    return outbox.saveAcceptedOrder(order, reservation)
+      TacoOrder order, InventoryReservation reservation,
+      Function<TacoOrder, Mono<Void>> afterOutbox) {
+    return outbox.saveAcceptedOrder(order, reservation, afterOutbox)
         .onErrorResume(error -> releaseAndPropagate(reservation, error));
   }
 

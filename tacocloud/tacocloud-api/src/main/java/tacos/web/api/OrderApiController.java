@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +22,7 @@ import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.OrderMapper;
 import tacos.correlation.CorrelationContext;
+import tacos.idempotency.OrderIdempotencyService;
 
 @RestController
 @RequestMapping(path = "/api/orders", produces = "application/json")
@@ -28,21 +30,26 @@ public class OrderApiController {
 
   private final OrderService orderService;
   private final OrderMapper orderMapper;
+  private final OrderIdempotencyService idempotency;
 
-  public OrderApiController(OrderService orderService, OrderMapper orderMapper) {
+  public OrderApiController(OrderService orderService, OrderMapper orderMapper,
+      OrderIdempotencyService idempotency) {
     this.orderService = orderService;
     this.orderMapper = orderMapper;
+    this.idempotency = idempotency;
   }
 
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
   public Mono<OrderResponse> postOrder(
       @Valid @RequestBody OrderCreateRequest request,
+      @RequestHeader(value = "Idempotency-Key", required = false) String key,
       Authentication authentication) {
-    TacoOrder order = orderMapper.toEntity(request);
     return CorrelationContext.fromCurrentRequest(
-        orderService.createOrder(order, authentication)
-            .map(orderMapper::toResponse));
+        key == null
+            ? orderService.createOrder(orderMapper.toEntity(request), authentication)
+                .map(orderMapper::toResponse)
+            : idempotency.create(request, key, authentication));
   }
 
   @PostMapping(path = "fromEmail", consumes = "application/json")

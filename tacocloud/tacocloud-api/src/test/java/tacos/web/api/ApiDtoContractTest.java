@@ -49,7 +49,8 @@ class ApiDtoContractTest {
   void setUp() {
     orderService = mock(OrderService.class);
     historyService = mock(OrderHistoryService.class);
-    OrderApiController controller = new OrderApiController(orderService, new OrderMapper());
+    OrderApiController controller = new OrderApiController(orderService, new OrderMapper(),
+        mock(tacos.idempotency.OrderIdempotencyService.class));
     client = WebTestClient.bindToController(controller,
         new OrderHistoryController(historyService)).build();
   }
