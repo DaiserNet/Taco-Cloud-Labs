@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.MongoException;
 import com.rabbitmq.client.Channel;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
@@ -71,6 +72,7 @@ public class OrderListener {
   @RabbitListener(queues = "${tacocloud.messaging.rabbitmq.destination}")
   public void receiveOrder(Message message, Channel channel) throws IOException {
     long deliveryTag = message.getMessageProperties().getDeliveryTag();
+    Timer.Sample processing = Timer.start(metrics);
     OrderEvent event = null;
     KitchenEventProcessor.Result result;
     try {
@@ -84,6 +86,8 @@ public class OrderListener {
     if (result == KitchenEventProcessor.Result.DUPLICATE) {
       count("duplicate");
     } else {
+      processing.stop(metrics.timer("tacocloud.kitchen.processing",
+          "result", "processed", "transport", "rabbitmq"));
       count("processed");
       ui.displayOrder(event);
     }

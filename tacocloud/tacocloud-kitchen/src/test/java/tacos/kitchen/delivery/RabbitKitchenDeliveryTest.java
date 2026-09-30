@@ -107,6 +107,8 @@ class RabbitKitchenDeliveryTest {
     RabbitOrderMessagingService publisher =
         new RabbitOrderMessagingService(rabbit, QUEUE, 5000);
     double duplicates = metric("duplicate");
+    long processing = metrics.timer("tacocloud.kitchen.processing",
+        "result", "processed", "transport", "rabbitmq").count();
 
     StepVerifier.create(publisher.publish(event)).verifyComplete();
     await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
@@ -118,6 +120,8 @@ class RabbitKitchenDeliveryTest {
         .until(() -> metric("duplicate") > duplicates);
 
     assertEquals(1, mongo.count(new Query(), KitchenOrderReceipt.class));
+    assertEquals(processing + 1, metrics.timer("tacocloud.kitchen.processing",
+        "result", "processed", "transport", "rabbitmq").count());
     ProcessedOrderEvent marker = mongo.findById(event.getEventId(),
         ProcessedOrderEvent.class);
     assertNotNull(marker);
@@ -173,6 +177,7 @@ class RabbitKitchenDeliveryTest {
   @Test
   void shouldDeadLetterExhaustedTransientFailure() {
     OrderEvent event = event("ORDER-FAILED");
+    double deadLetters = metric("dlq");
     AtomicInteger attempts = new AtomicInteger();
     doAnswer(call -> {
       OrderEvent received = call.getArgument(0);
@@ -197,6 +202,7 @@ class RabbitKitchenDeliveryTest {
     assertTrue(!letter.getMessageProperties().getHeaders().toString()
         .contains("private detail"));
     assertEquals(0, mongo.count(new Query(), KitchenOrderReceipt.class));
+    assertEquals(deadLetters + 1, metric("dlq"));
   }
 
   @Test

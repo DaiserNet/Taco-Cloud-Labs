@@ -80,12 +80,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
 #end::exposeAll[]
 #end::excludeSome[]
 #tag::healthShowDetails[]
   endpoint:
     health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,mongo,outbox
       show-details: when_authorized
       roles: ADMIN
 #end::healthShowDetails[]
@@ -111,6 +116,7 @@ tacocloud:
     lease-ms: ${TACOCLOUD_OUTBOX_LEASE_MS:60000}
     send-timeout-ms: ${TACOCLOUD_OUTBOX_SEND_TIMEOUT_MS:30000}
     poll-delay-ms: ${TACOCLOUD_OUTBOX_POLL_DELAY_MS:5000}
+    health-max-age-ms: ${TACOCLOUD_OUTBOX_HEALTH_MAX_AGE_MS:60000}
   messaging:
     transport: ${TACOCLOUD_MESSAGING_TRANSPORT:noop}
     jms:

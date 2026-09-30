@@ -25,6 +25,7 @@ import javax.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -64,6 +65,7 @@ class OrderCouponControllerTest {
   private PaymentMethodService paymentMethodService;
   private OrderMessagingService messaging;
   private MockMvc mvc;
+  private SimpleMeterRegistry metricsRegistry;
 
   @BeforeEach
   void setUp() {
@@ -72,6 +74,7 @@ class OrderCouponControllerTest {
     userRepo = mock(UserRepository.class);
     paymentMethodService = mock(PaymentMethodService.class);
     messaging = mock(OrderMessagingService.class);
+    metricsRegistry = new SimpleMeterRegistry();
 
     CouponProperties properties = new CouponProperties();
     properties.getCodes().put("SAVE10", percentageRule());
@@ -92,7 +95,8 @@ class OrderCouponControllerTest {
         mock(EmailOrderService.class),
         OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService), userRepo,
         mock(Validator.class), paymentMethodService, pricingService,
-        couponService, inventoryService);
+        couponService, inventoryService, new tacos.observability.OrderMetrics(
+            metricsRegistry, "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
         new OrderApiController(orderService, new OrderMapper()))
         .setControllerAdvice(new ApiExceptionHandler())
@@ -129,6 +133,8 @@ class OrderCouponControllerTest {
     assertEquals("SAVE10", saved.getValue().getCouponCode());
     assertEquals(new BigDecimal("0.29"), saved.getValue().getDiscount());
     assertEquals(new BigDecimal("2.61"), saved.getValue().getTotal());
+    assertEquals(1, metricsRegistry.get("tacocloud.coupons.applied")
+        .tag("source", "HTTP_API").counter().count());
     org.mockito.Mockito.verifyNoInteractions(messaging);
   }
 

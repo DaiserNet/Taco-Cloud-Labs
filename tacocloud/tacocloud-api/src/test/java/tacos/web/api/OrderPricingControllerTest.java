@@ -86,7 +86,8 @@ class OrderPricingControllerTest {
         mock(EmailOrderService.class),
         OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService), userRepo,
         mock(Validator.class), paymentMethodService, pricingService,
-        couponService, inventoryService);
+        couponService, inventoryService, new tacos.observability.OrderMetrics(
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
         new OrderApiController(orderService, new OrderMapper()))
         .setControllerAdvice(new ApiExceptionHandler())

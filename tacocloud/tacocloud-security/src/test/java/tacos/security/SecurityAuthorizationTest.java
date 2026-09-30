@@ -253,6 +253,12 @@ class SecurityAuthorizationTest {
   @Test
   void shouldProtectDataRestAndActuatorWhileKeepingHealthPublic() throws Exception {
     mvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+    mvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+    mvc.perform(get("/actuator/metrics"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/actuator/metrics").with(user("user").roles("USER")))
+        .andExpect(status().isForbidden());
     mvc.perform(get("/data-api/users").with(user("user").roles("USER")))
         .andExpect(status().isForbidden());
     mvc.perform(get("/actuator/info").with(user("user").roles("USER")))
@@ -260,6 +266,9 @@ class SecurityAuthorizationTest {
     mvc.perform(get("/data-api/users").with(user("admin").roles("ADMIN")))
         .andExpect(status().isOk());
     mvc.perform(get("/actuator/info").with(user("admin").roles("ADMIN")))
+        .andExpect(status().isOk());
+    mvc.perform(get("/actuator/metrics")
+        .with(user("admin").roles("ADMIN")))
         .andExpect(status().isOk());
   }
 
@@ -273,7 +282,9 @@ class SecurityAuthorizationTest {
         "/api/admin/orders", "/api/admin/orders/ANY",
         "/api/kitchen/queue", "/api/kitchen/ui",
         "/api/users/me/favorites", "/api/users/bob/favorites",
-        "/data-api/users", "/actuator/health", "/actuator/info", "/unlisted"})
+        "/data-api/users", "/actuator/health",
+        "/actuator/health/liveness", "/actuator/health/readiness",
+        "/actuator/info", "/actuator/metrics", "/unlisted"})
     String read() {
       return "ok";
     }

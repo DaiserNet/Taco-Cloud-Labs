@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -24,8 +25,10 @@ class OrderWorkflowCancellationTest {
   void shouldRetryInventoryReleaseWithoutSecondStatusChange() {
     OrderRepository orders = mock(OrderRepository.class);
     InventoryService inventory = mock(InventoryService.class);
+    SimpleMeterRegistry metricsRegistry = new SimpleMeterRegistry();
     OrderWorkflowService workflow = new OrderWorkflowService(orders, inventory,
-        mock(ReactiveMongoTemplate.class));
+        mock(ReactiveMongoTemplate.class), new tacos.observability.OrderMetrics(
+            metricsRegistry, "noop"));
     User owner = new User("alice", "encoded", "Alice", "Street", "City",
         "ST", "12345", "5551234", "alice@example.com");
     TacoOrder order = new TacoOrder();
@@ -55,5 +58,7 @@ class OrderWorkflowCancellationTest {
         }).verifyComplete();
     verify(orders, times(1)).save(order);
     verify(inventory, times(2)).release("R1");
+    assertEquals(1, metricsRegistry.get("tacocloud.orders.cancelled")
+        .tag("source", "customer").counter().count());
   }
 }

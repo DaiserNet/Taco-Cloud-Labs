@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,6 +36,7 @@ import org.springframework.util.StreamUtils;
 import reactor.core.publisher.Flux;
 import tacos.data.UserRepository;
 import tacos.correlation.CorrelationIdFilter;
+import tacos.outbox.OutboxHealthIndicator;
 
 @SpringBootTest(properties = {
     "spring.data.mongodb.port=0",
@@ -53,6 +55,35 @@ class UiSecuritySmokeTest {
 
   @Autowired
   private PasswordEncoder passwordEncoder;
+
+  @Autowired
+  private OutboxHealthIndicator outboxHealth;
+
+  @Test
+  void shouldExposeProbesAndRestrictActualMetricsEndpoint() throws Exception {
+    outboxHealth.refresh().toFuture().get(5,
+        java.util.concurrent.TimeUnit.SECONDS);
+    mvc.perform(get("/actuator/health/liveness"))
+        .andExpect(status().isOk());
+    MvcResult publicReadiness = mvc.perform(get("/actuator/health/readiness"))
+        .andExpect(status().isOk()).andReturn();
+    assertFalse(publicReadiness.getResponse().getContentAsString()
+        .contains("components"));
+    MvcResult adminReadiness = mvc.perform(get("/actuator/health/readiness")
+        .with(user("admin").roles("ADMIN")))
+        .andExpect(status().isOk()).andReturn();
+    assertTrue(adminReadiness.getResponse().getContentAsString()
+        .contains("outbox"));
+    mvc.perform(get("/actuator/metrics"))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/actuator/metrics").with(user("alice").roles("USER")))
+        .andExpect(status().isForbidden());
+    MvcResult admin = mvc.perform(get("/actuator/metrics")
+        .with(user("admin").roles("ADMIN")))
+        .andExpect(status().isOk()).andReturn();
+    assertTrue(admin.getResponse().getContentAsString()
+        .contains("tacocloud.outbox.pending"));
+  }
 
   @Test
   void shouldApplyCorrelationFilterInRealMvcContext() throws Exception {

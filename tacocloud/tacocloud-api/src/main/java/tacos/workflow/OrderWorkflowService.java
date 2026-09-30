@@ -28,6 +28,7 @@ import tacos.OrderStatusChange;
 import tacos.TacoOrder;
 import tacos.data.OrderRepository;
 import tacos.inventory.InventoryService;
+import tacos.observability.OrderMetrics;
 
 @Service
 public class OrderWorkflowService {
@@ -47,12 +48,15 @@ public class OrderWorkflowService {
   private final OrderRepository orders;
   private final InventoryService inventory;
   private final ReactiveMongoTemplate mongo;
+  private final OrderMetrics metrics;
 
   public OrderWorkflowService(OrderRepository orders,
-      InventoryService inventory, ReactiveMongoTemplate mongo) {
+      InventoryService inventory, ReactiveMongoTemplate mongo,
+      OrderMetrics metrics) {
     this.orders = orders;
     this.inventory = inventory;
     this.mongo = mongo;
+    this.metrics = metrics;
   }
 
   public Mono<TacoOrder> claimNext(Authentication authentication) {
@@ -175,6 +179,7 @@ public class OrderWorkflowService {
             append(order, previous, OrderStatus.CANCELLED,
                 authentication.getName(), "ROLE_USER", "CUSTOMER_API", reason);
             return orders.save(order)
+                .doOnNext(saved -> metrics.cancelled())
                 .flatMap(saved -> inventory
                     .release(saved.getInventoryReservationId())
                     .thenReturn(saved));

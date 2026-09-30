@@ -66,7 +66,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         .antMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
         .antMatchers("/api/favorites/**", "/api/ratings/**").hasRole("USER")
         .antMatchers("/data-api/**").hasRole("ADMIN")
-        .antMatchers("/actuator/health").permitAll()
+        .antMatchers("/actuator/health", "/actuator/health/liveness",
+            "/actuator/health/readiness").permitAll()
         .antMatchers("/actuator/**").hasRole("ADMIN")
         .anyRequest().denyAll()
 

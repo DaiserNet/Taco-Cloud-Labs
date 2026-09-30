@@ -23,6 +23,7 @@ import javax.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -65,6 +66,7 @@ class OrderInventoryControllerTest {
   private InventoryReservation reservation;
   private OrderService orderService;
   private MockMvc mvc;
+  private SimpleMeterRegistry metricsRegistry;
 
   @BeforeEach
   void setUp() {
@@ -87,10 +89,12 @@ class OrderInventoryControllerTest {
     when(inventoryService.release(any(String.class))).thenReturn(Mono.empty());
 
     outbox = OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService);
+    metricsRegistry = new SimpleMeterRegistry();
     orderService = new OrderService(orderRepo, mock(EmailOrderService.class),
         outbox,
         userRepo, mock(Validator.class), paymentMethodService,
-        pricingService, couponService, inventoryService);
+        pricingService, couponService, inventoryService,
+        new tacos.observability.OrderMetrics(metricsRegistry, "noop"));
     mvc = MockMvcBuilders.standaloneSetup(
         new OrderApiController(orderService, new OrderMapper()))
         .setControllerAdvice(new ApiExceptionHandler())
@@ -121,6 +125,10 @@ class OrderInventoryControllerTest {
     effects.verify(orderRepo).save(order);
     effects.verify(inventoryService).accept("RESERVATION-ID", "ORDER-ID");
     verifyNoInteractions(messaging);
+    assertEquals(1, metricsRegistry.get("tacocloud.orders.created")
+        .tag("source", "HTTP_API").counter().count());
+    assertEquals(1, metricsRegistry.get("tacocloud.orders.placement")
+        .tag("result", "created").timer().count());
   }
 
   @Test
@@ -215,6 +223,10 @@ class OrderInventoryControllerTest {
 
     verify(orderRepo, never()).save(any(TacoOrder.class));
     verifyNoInteractions(messaging);
+    assertEquals(1, metricsRegistry.get("tacocloud.orders.failed")
+        .tag("source", "HTTP_API").counter().count());
+    assertEquals(1, metricsRegistry.get("tacocloud.inventory.stock.rejected")
+        .tag("source", "HTTP_API").counter().count());
   }
 
   private ResultActions perform(

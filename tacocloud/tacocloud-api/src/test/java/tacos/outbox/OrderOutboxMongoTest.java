@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
 import org.junit.jupiter.api.AfterAll;
@@ -27,6 +28,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.mongodb.ReactiveMongoTransactionManager;
+import org.springframework.boot.actuate.health.Status;
 import org.springframework.data.mongodb.repository.support.ReactiveMongoRepositoryFactory;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import org.testcontainers.containers.MongoDBContainer;
@@ -110,6 +112,24 @@ class OrderOutboxMongoTest {
   }
 
   @Test
+  void shouldMeasureRealPendingOutboxDocumentsWithoutLoadingPayloads() {
+    OutboxEvent event = insertEvent();
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    OutboxHealthIndicator health = new OutboxHealthIndicator(outbox,
+        registry, 60000);
+
+    StepVerifier.create(health.refresh()).verifyComplete();
+    assertEquals(1.0, registry.get("tacocloud.outbox.pending").gauge().value());
+
+    StepVerifier.create(mongo.updateFirst(
+        Query.query(Criteria.where("_id").is(event.getEventId())),
+        Update.update("status", OutboxEvent.Status.PUBLISHED),
+        OutboxEvent.class)).expectNextCount(1).verifyComplete();
+    StepVerifier.create(health.refresh()).verifyComplete();
+    assertEquals(0.0, registry.get("tacocloud.outbox.pending").gauge().value());
+  }
+
+  @Test
   void shouldRollbackOrderWhenOutboxInsertFailsBeforeCommit() {
     OutboxRepository failing = mock(OutboxRepository.class);
     when(failing.save(any(OutboxEvent.class)))
@@ -129,12 +149,18 @@ class OrderOutboxMongoTest {
   @Test
   void shouldRetryBrokerFailureAfterRestartWithSameEventId() {
     OutboxEvent pending = insertEvent();
+    OutboxHealthIndicator health = new OutboxHealthIndicator(outbox,
+        new SimpleMeterRegistry(), 60000);
+    StepVerifier.create(health.refresh()).verifyComplete();
     OrderMessagingService failedBroker = mock(OrderMessagingService.class);
     when(failedBroker.publish(any(OrderEvent.class)))
         .thenReturn(Mono.error(new IllegalStateException("broker down")));
 
-    StepVerifier.create(publisher(failedBroker, 3).publishBatch())
+    StepVerifier.create(publisher(failedBroker, 3, health).publishBatch())
         .verifyComplete();
+    assertEquals(Status.DOWN, health.health().getStatus());
+    assertEquals("BROKER_DELIVERY_FAILED",
+        health.health().getDetails().get("reason"));
     StepVerifier.create(outbox.findById(pending.getEventId()))
         .assertNext(event -> {
           assertEquals(OutboxEvent.Status.FAILED, event.getStatus());
@@ -149,8 +175,10 @@ class OrderOutboxMongoTest {
     OrderMessagingService recoveredBroker = mock(OrderMessagingService.class);
     when(recoveredBroker.publish(any(OrderEvent.class))).thenReturn(Mono.empty());
 
-    StepVerifier.create(publisher(recoveredBroker, 3).publishBatch())
+    StepVerifier.create(publisher(recoveredBroker, 3, health).publishBatch())
         .verifyComplete();
+    StepVerifier.create(health.refresh()).verifyComplete();
+    assertEquals(Status.UP, health.health().getStatus());
     StepVerifier.create(outbox.findById(pending.getEventId()))
         .assertNext(event -> {
           assertEquals(OutboxEvent.Status.PUBLISHED, event.getStatus());
@@ -252,7 +280,14 @@ class OrderOutboxMongoTest {
 
   private OutboxPublisher publisher(OrderMessagingService broker,
       int maxAttempts) {
-    return new OutboxPublisher(mongo, broker, JSON, 2, maxAttempts,
+    return publisher(broker, maxAttempts, new OutboxHealthIndicator(outbox,
+        new SimpleMeterRegistry(), 60000));
+  }
+
+  private OutboxPublisher publisher(OrderMessagingService broker,
+      int maxAttempts, OutboxHealthIndicator health) {
+    return new OutboxPublisher(mongo, broker, JSON, health,
+        2, maxAttempts,
         1000, 60000, 60000, 30000);
   }
 }

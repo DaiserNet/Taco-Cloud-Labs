@@ -16,6 +16,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -43,6 +44,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
+import tacos.observability.OrderMetrics;
 
 @SpringBootTest(classes = OrderWorkflowMongoTest.TestApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -64,6 +66,7 @@ class OrderWorkflowMongoTest {
   }
 
   @Autowired private OrderWorkflowService workflow;
+  @MockBean private OrderMetrics metrics;
   @Autowired private OrderRepository orders;
   @Autowired private UserRepository users;
   @Autowired private IngredientRepository ingredients;

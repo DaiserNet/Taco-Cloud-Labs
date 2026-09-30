@@ -20,10 +20,18 @@ spring:
       uri: ${TACOCLOUD_KITCHEN_MONGODB_URI:mongodb://localhost:27017/tacocloud?replicaSet=rs0}
 
 management:
+  server:
+    port: ${TACOCLOUD_KITCHEN_MANAGEMENT_PORT:8082}
+    address: ${TACOCLOUD_KITCHEN_MANAGEMENT_ADDRESS:127.0.0.1}
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 tacocloud:
   messaging:

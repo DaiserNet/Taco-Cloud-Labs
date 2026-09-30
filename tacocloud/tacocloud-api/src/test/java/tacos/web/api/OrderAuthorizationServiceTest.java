@@ -67,7 +67,9 @@ class OrderAuthorizationServiceTest {
     service = new OrderService(orderRepo, emailOrderService,
         OrderOutboxTestSupport.commitUsing(orderRepo, inventoryService),
         userRepo, mock(Validator.class), paymentMethodService,
-        orderPricingService, couponService, inventoryService);
+        orderPricingService, couponService, inventoryService,
+        new tacos.observability.OrderMetrics(
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
   }
 
   @Test

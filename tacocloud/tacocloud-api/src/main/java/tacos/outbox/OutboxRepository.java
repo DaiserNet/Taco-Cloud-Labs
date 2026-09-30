@@ -1,5 +1,10 @@
 package tacos.outbox;
 
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import java.util.Collection;
 
-public interface OutboxRepository extends ReactiveCrudRepository<OutboxEvent, String> { }
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
+
+public interface OutboxRepository extends ReactiveCrudRepository<OutboxEvent, String> {
+  Mono<Long> countByStatusIn(Collection<OutboxEvent.Status> statuses);
+}

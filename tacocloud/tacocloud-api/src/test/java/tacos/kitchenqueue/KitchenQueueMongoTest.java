@@ -20,6 +20,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
@@ -43,6 +44,7 @@ import tacos.User;
 import tacos.api.dto.KitchenOrderResponse;
 import tacos.data.OrderRepository;
 import tacos.inventory.InventoryService;
+import tacos.observability.OrderMetrics;
 import tacos.workflow.OrderWorkflowService;
 
 @SpringBootTest(classes = KitchenQueueMongoTest.TestApplication.class,
@@ -66,6 +68,7 @@ class KitchenQueueMongoTest {
   }
 
   @Autowired private OrderRepository orders;
+  @MockBean private OrderMetrics metrics;
   @Autowired private OrderWorkflowService workflow;
   @Autowired private KitchenQueueService queue;
   @Autowired private ReactiveMongoTemplate mongo;

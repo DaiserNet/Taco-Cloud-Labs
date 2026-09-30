@@ -22,6 +22,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
+import tacos.observability.OrderMetrics;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
@@ -38,12 +39,13 @@ public class OrderService {
   private final OrderPricingService orderPricingService;
   private final CouponService couponService;
   private final InventoryService inventoryService;
+  private final OrderMetrics metrics;
 
   public OrderService(OrderRepository repo, EmailOrderService emailOrderService,
       OrderOutboxService outbox, UserRepository userRepo,
       Validator validator, PaymentMethodService paymentMethodService,
       OrderPricingService orderPricingService, CouponService couponService,
-      InventoryService inventoryService) {
+      InventoryService inventoryService, OrderMetrics metrics) {
     this.repo = repo;
     this.emailOrderService = emailOrderService;
     this.outbox = outbox;
@@ -53,6 +55,7 @@ public class OrderService {
     this.orderPricingService = orderPricingService;
     this.couponService = couponService;
     this.inventoryService = inventoryService;
+    this.metrics = metrics;
   }
 
   public Mono<TacoOrder> createOrder(
@@ -69,7 +72,7 @@ public class OrderService {
   public Mono<TacoOrder> createOrder(TacoOrder order,
       Authentication authentication,
       Function<TacoOrder, Mono<Void>> beforeReservation, String origin) {
-    return currentUser(authentication)
+    return metrics.placement(currentUser(authentication)
         .flatMap(user -> paymentMethodService
             .findOwned(order.getPaymentMethodId(), authentication)
             .flatMap(payment -> orderPricingService.price(order)
@@ -83,12 +86,12 @@ public class OrderService {
                         initializeLifecycle(pricedOrder, authentication, origin);
                         return reserveSaveAndAccept(pricedOrder);
                       }));
-                })));
+                }))), origin);
   }
 
   public Mono<TacoOrder> createFromEmail(
       EmailOrder emailOrder, Authentication authentication) {
-    return Mono.defer(() -> {
+    return metrics.placement(Mono.defer(() -> {
       if (!isAuthenticated(authentication)) {
         return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
       }
@@ -106,7 +109,7 @@ public class OrderService {
         .flatMap(order -> {
           initializeLifecycle(order, authentication, "EMAIL");
           return reserveSaveAndAccept(order);
-        });
+        }), "EMAIL");
   }
 
   public Mono<TacoOrder> patchOrder(

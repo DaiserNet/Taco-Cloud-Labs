@@ -42,6 +42,7 @@ import tacos.data.OrderRepository;
 import tacos.data.UserRepository;
 import tacos.inventory.InventoryService;
 import tacos.messaging.OrderMessagingService;
+import tacos.observability.OrderMetrics;
 import tacos.payment.PaymentMethodService;
 import tacos.pricing.CouponService;
 import tacos.pricing.OrderPricingService;
@@ -87,6 +88,9 @@ public class OrderApiControllerTest {
 
     @MockBean
     private InventoryService inventoryService;
+
+    @MockBean
+    private OrderMetrics orderMetrics;
 
     @Test 
     public void shouldPatchZipWithoutChangingState() {

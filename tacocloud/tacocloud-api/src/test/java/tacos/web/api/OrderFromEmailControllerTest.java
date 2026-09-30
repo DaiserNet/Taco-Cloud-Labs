@@ -83,7 +83,8 @@ class OrderFromEmailControllerTest {
         OrderOutboxTestSupport.commitUsing(repo, inventoryService),
         userRepo, mock(Validator.class),
         mock(tacos.payment.PaymentMethodService.class), orderPricingService,
-        couponService, inventoryService);
+        couponService, inventoryService, new tacos.observability.OrderMetrics(
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
     controller = new OrderApiController(orderService, new OrderMapper());
   }
 

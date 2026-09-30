@@ -136,7 +136,9 @@ class ReorderMongoTest {
         mock(EmailOrderService.class),
         OrderOutboxTestSupport.commitUsing(orderRepo, inventory),
         userRepo, validator,
-        payments, pricing, coupons, inventory);
+        payments, pricing, coupons, inventory,
+        new tacos.observability.OrderMetrics(
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), "noop"));
     OrderHistoryService history = new OrderHistoryService(mongo, userRepo,
         mapper, 50);
     reorders = new ReorderService(history, mapper, validator, payments,

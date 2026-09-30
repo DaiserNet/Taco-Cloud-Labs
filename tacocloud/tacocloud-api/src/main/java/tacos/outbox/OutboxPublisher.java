@@ -24,6 +24,7 @@ public class OutboxPublisher {
   private final ReactiveMongoTemplate mongo;
   private final OrderMessagingService messages;
   private final ObjectMapper json;
+  private final OutboxHealthIndicator health;
   private final int batchSize;
   private final int maxAttempts;
   private final Duration backoff;
@@ -32,7 +33,7 @@ public class OutboxPublisher {
   private final Duration sendTimeout;
 
   public OutboxPublisher(ReactiveMongoTemplate mongo, OrderMessagingService messages,
-      ObjectMapper json,
+      ObjectMapper json, OutboxHealthIndicator health,
       @Value("${tacocloud.outbox.batch-size:50}") int batchSize,
       @Value("${tacocloud.outbox.max-attempts:10}") int maxAttempts,
       @Value("${tacocloud.outbox.backoff-ms:1000}") long backoffMs,
@@ -47,6 +48,7 @@ public class OutboxPublisher {
     this.mongo = mongo;
     this.messages = messages;
     this.json = json;
+    this.health = health;
     this.batchSize = batchSize;
     this.maxAttempts = maxAttempts;
     this.backoff = Duration.ofMillis(backoffMs);
@@ -86,7 +88,10 @@ public class OutboxPublisher {
   private Mono<Void> publishClaimed(OutboxEvent claimed) {
     return Mono.fromCallable(() -> json.readValue(
             claimed.getPayloadJson(), OrderEvent.class))
-        .flatMap(event -> messages.publish(event).timeout(sendTimeout))
+        .doOnError(error -> health.deliveryFailed("INVALID_OUTBOX_EVENT"))
+        .flatMap(event -> messages.publish(event).timeout(sendTimeout)
+            .doOnError(error -> health.deliveryFailed("BROKER_DELIVERY_FAILED"))
+            .doOnSuccess(ignored -> health.deliveryRecovered()))
         .then(Mono.just(true))
         .onErrorResume(error -> markFailed(claimed, error).thenReturn(false))
         .flatMap(sent -> sent ? markPublished(claimed) : Mono.empty());

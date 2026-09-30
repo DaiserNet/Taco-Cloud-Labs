@@ -16,10 +16,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 public class OutboxPolling {
   private static final Logger log = LoggerFactory.getLogger(OutboxPolling.class);
   private final OutboxPublisher publisher;
+  private final OutboxHealthIndicator health;
   private final AtomicBoolean running = new AtomicBoolean();
 
-  public OutboxPolling(OutboxPublisher publisher) {
+  public OutboxPolling(OutboxPublisher publisher, OutboxHealthIndicator health) {
     this.publisher = publisher;
+    this.health = health;
   }
 
   @Scheduled(initialDelayString = "${tacocloud.outbox.poll-delay-ms:5000}",
@@ -28,7 +30,7 @@ public class OutboxPolling {
     if (!running.compareAndSet(false, true)) {
       return;
     }
-    publisher.publishBatch()
+    publisher.publishBatch().then(health.refresh())
         .doFinally(signal -> running.set(false))
         .subscribe(ignored -> { }, error ->
             log.error("Outbox polling failed; next poll will retry", error));
