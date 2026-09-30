@@ -14,7 +14,7 @@ import tacos.messaging.OrderEventPayload;
 final class OrderEventFactory {
   private OrderEventFactory() { }
 
-  static OrderEvent created(TacoOrder order) {
+  static OrderEvent created(TacoOrder order, String correlationId) {
     String orderId = Objects.requireNonNull(order.getId(), "saved order ID");
     List<OrderEventPayload.Item> items = new ArrayList<>();
     if (order.getItems() != null && !order.getItems().isEmpty()) {
@@ -26,7 +26,8 @@ final class OrderEventFactory {
         items.add(item(taco, 1));
       }
     }
-    return OrderEvent.created(orderId, new OrderEventPayload(orderId, items));
+    return OrderEvent.created(correlationId,
+        new OrderEventPayload(orderId, items));
   }
 
   private static OrderEventPayload.Item item(Taco taco, int quantity) {

@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.UUID;
 
 import javax.servlet.http.Cookie;
 
@@ -33,6 +34,7 @@ import org.springframework.util.StreamUtils;
 
 import reactor.core.publisher.Flux;
 import tacos.data.UserRepository;
+import tacos.correlation.CorrelationIdFilter;
 
 @SpringBootTest(properties = {
     "spring.data.mongodb.port=0",
@@ -51,6 +53,26 @@ class UiSecuritySmokeTest {
 
   @Autowired
   private PasswordEncoder passwordEncoder;
+
+  @Test
+  void shouldApplyCorrelationFilterInRealMvcContext() throws Exception {
+    MvcResult generated = mvc.perform(get("/"))
+        .andExpect(status().isOk()).andReturn();
+    UUID.fromString(generated.getResponse()
+        .getHeader(CorrelationIdFilter.HEADER));
+
+    MvcResult preserved = mvc.perform(get("/")
+        .header(CorrelationIdFilter.HEADER, "client-123"))
+        .andExpect(status().isOk()).andReturn();
+    assertEquals("client-123", preserved.getResponse()
+        .getHeader(CorrelationIdFilter.HEADER));
+
+    MvcResult replaced = mvc.perform(get("/")
+        .header(CorrelationIdFilter.HEADER, "evil\nforged"))
+        .andExpect(status().isOk()).andReturn();
+    UUID.fromString(replaced.getResponse()
+        .getHeader(CorrelationIdFilter.HEADER));
+  }
 
   @Test
   void shouldServeRealAngularEntryBundlesAndAssetsWithoutOpeningOtherRoutes()

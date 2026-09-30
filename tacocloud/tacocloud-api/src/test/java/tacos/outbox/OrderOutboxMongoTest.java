@@ -36,6 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
+import tacos.correlation.CorrelationContext;
 import tacos.data.OrderRepository;
 import tacos.inventory.InventoryReservation;
 import tacos.inventory.InventoryService;
@@ -90,7 +91,9 @@ class OrderOutboxMongoTest {
   @Test
   void shouldCommitOrderAndNewOutboxTogether() {
     TacoOrder order = order();
-    StepVerifier.create(commit(outbox).saveAcceptedOrder(order, reservation()))
+    StepVerifier.create(commit(outbox).saveAcceptedOrder(order, reservation())
+        .contextWrite(context -> context.put(CorrelationContext.CONTEXT_KEY,
+            "client-123")))
         .expectNextCount(1).verifyComplete();
 
     StepVerifier.create(orders.findById(order.getId())
@@ -100,6 +103,8 @@ class OrderOutboxMongoTest {
           assertEquals(OutboxEvent.Status.NEW, pair.getT2().getStatus());
           assertEquals(1, pair.getT2().getVersion());
           assertTrue(pair.getT2().getPayloadJson().contains(order.getId()));
+          assertTrue(pair.getT2().getPayloadJson()
+              .contains("\"correlationId\":\"client-123\""));
           assertTrue(!pair.getT2().getPayloadJson().contains("paymentMethodId"));
         }).verifyComplete();
   }

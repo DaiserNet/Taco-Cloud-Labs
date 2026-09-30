@@ -20,6 +20,7 @@ import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.mapper.OrderMapper;
+import tacos.correlation.CorrelationContext;
 
 @RestController
 @RequestMapping(path = "/api/orders", produces = "application/json")
@@ -39,8 +40,9 @@ public class OrderApiController {
       @Valid @RequestBody OrderCreateRequest request,
       Authentication authentication) {
     TacoOrder order = orderMapper.toEntity(request);
-    return orderService.createOrder(order, authentication)
-        .map(orderMapper::toResponse);
+    return CorrelationContext.fromCurrentRequest(
+        orderService.createOrder(order, authentication)
+            .map(orderMapper::toResponse));
   }
 
   @PostMapping(path = "fromEmail", consumes = "application/json")
@@ -48,8 +50,9 @@ public class OrderApiController {
   public Mono<OrderResponse> postOrderFromEmail(
       @Valid @RequestBody EmailOrder emailOrder,
       Authentication authentication) {
-    return orderService.createFromEmail(emailOrder, authentication)
-        .map(orderMapper::toResponse);
+    return CorrelationContext.fromCurrentRequest(
+        orderService.createFromEmail(emailOrder, authentication)
+            .map(orderMapper::toResponse));
   }
 
   @PutMapping(path = "/{orderId}", consumes = "application/json")

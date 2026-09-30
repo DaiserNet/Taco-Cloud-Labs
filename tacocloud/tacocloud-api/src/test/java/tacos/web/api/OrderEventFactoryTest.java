@@ -38,9 +38,10 @@ class OrderEventFactoryTest {
     line.setQuantity(2);
     order.addItem(line);
 
-    OrderEvent event = OrderEventFactory.created(order);
+    OrderEvent event = OrderEventFactory.created(order, "request-123");
     String json = new ObjectMapper().writeValueAsString(event);
-    assertEquals("ORDER-1", event.getCorrelationId());
+    assertEquals("request-123", event.getCorrelationId());
+    assertFalse(event.getCorrelationId().equals(order.getId()));
     assertEquals("FLTO", event.getPayload().getItems().get(0)
         .getIngredients().get(0).getId());
     assertEquals(2, event.getPayload().getItems().get(0).getQuantity());

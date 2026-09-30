@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import tacos.api.dto.ReorderConfirmResponse;
 import tacos.api.dto.ReorderQuoteResponse;
 import tacos.api.dto.ReorderRequest;
+import tacos.correlation.CorrelationContext;
 import tacos.reorder.ReorderService;
 
 @RestController
@@ -42,9 +43,10 @@ public class ReorderController {
       @Valid @RequestBody ReorderRequest request,
       @RequestHeader("Idempotency-Key") String idempotencyKey,
       Authentication authentication) {
-    return reorders.confirm(sourceOrderId, request, idempotencyKey,
-        authentication)
-        .map(result -> ResponseEntity.status(result.isReplayed()
-            ? HttpStatus.OK : HttpStatus.CREATED).body(result));
+    return CorrelationContext.fromCurrentRequest(
+        reorders.confirm(sourceOrderId, request, idempotencyKey,
+            authentication)
+            .map(result -> ResponseEntity.status(result.isReplayed()
+                ? HttpStatus.OK : HttpStatus.CREATED).body(result)));
   }
 }

@@ -1,5 +1,6 @@
 package tacos.web.api;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,8 @@ import tacos.api.dto.OrderResponse;
 import tacos.api.dto.ReorderConfirmResponse;
 import tacos.api.dto.ReorderQuoteResponse;
 import tacos.api.dto.ReorderRequest;
+import tacos.correlation.CorrelationContext;
+import tacos.correlation.CorrelationIdFilter;
 import tacos.reorder.ReorderService;
 
 class ReorderControllerTest {
@@ -42,7 +46,32 @@ class ReorderControllerTest {
   void setUp() {
     service = mock(ReorderService.class);
     mvc = MockMvcBuilders.standaloneSetup(new ReorderController(service))
+        .addFilters(new CorrelationIdFilter())
         .build();
+  }
+
+  @Test
+  void shouldTransferHttpCorrelationIdToReactiveConfirmation() throws Exception {
+    AtomicReference<String> observed = new AtomicReference<>();
+    OrderResponse order = new OrderResponse();
+    order.setId("NEW");
+    when(service.confirm(eq("OLD"), any(ReorderRequest.class),
+        eq("request-key"), any(Authentication.class)))
+        .thenReturn(Mono.deferContextual(context -> {
+          observed.set(context.get(CorrelationContext.CONTEXT_KEY));
+          return Mono.just(new ReorderConfirmResponse(order, false));
+        }));
+
+    MvcResult result = perform(post("/api/orders/me/OLD/reorder")
+        .header(CorrelationIdFilter.HEADER, "client-123")
+        .header("Idempotency-Key", "request-key")
+        .content("{\"paymentMethodId\":\"PAY1\","
+            + "\"quoteFingerprint\":\"" + FINGERPRINT + "\"}"))
+        .andExpect(status().isCreated()).andReturn();
+
+    assertEquals("client-123", observed.get());
+    assertEquals("client-123", result.getResponse()
+        .getHeader(CorrelationIdFilter.HEADER));
   }
 
   @Test

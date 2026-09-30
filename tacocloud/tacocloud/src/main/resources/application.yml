@@ -12,6 +12,9 @@ taco:
 #logging:
 #  level:
 #    org.springframework.data.rest: debug
+logging:
+  pattern:
+    level: "%5p [correlationId=%X{correlationId}]"
 
 # tag::springBootAdminCreds[]
 # tag::springBootAdminUri[]
